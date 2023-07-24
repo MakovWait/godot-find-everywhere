@@ -15,6 +15,15 @@ func _enter_tree() -> void:
 	_popup_trigger.triggered.connect(_show_popup)
 	_popup_dialog = PluginPopup.instantiate()
 	get_editor_interface().get_base_control().add_child(_popup_dialog)
+	
+	_popup_dialog.add_tab(
+		"Open", 
+		preload("res://addons/find-everywhere/tabs/quick_open/quick_open.tscn").instantiate()
+	)
+	_popup_dialog.add_tab(
+		"Find",
+		preload("res://addons/find-everywhere/tabs/find_in_files/find_in_files.tscn").instantiate()
+	)
 
 
 func _exit_tree() -> void:

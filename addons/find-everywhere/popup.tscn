@@ -12,34 +12,15 @@ offset_top = 8.0
 offset_right = 192.0
 offset_bottom = 109.0
 
-[node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer"]
+[node name="HeaderContainer" type="HBoxContainer" parent="VBoxContainer"]
+unique_name_in_owner = true
 layout_mode = 2
 
-[node name="Button" type="Button" parent="VBoxContainer/HBoxContainer"]
-layout_mode = 2
-text = "All"
-flat = true
-
-[node name="Button2" type="Button" parent="VBoxContainer/HBoxContainer"]
-layout_mode = 2
-text = "Files"
-flat = true
-
-[node name="Button3" type="Button" parent="VBoxContainer/HBoxContainer"]
-layout_mode = 2
-text = "Classes"
-flat = true
-
-[node name="LineEdit" type="LineEdit" parent="VBoxContainer"]
-layout_mode = 2
-
-[node name="Tree" type="Tree" parent="VBoxContainer"]
+[node name="TabContainer" type="TabContainer" parent="VBoxContainer"]
+unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
-theme_override_constants/draw_guides = 1
-hide_folding = true
-hide_root = true
-
-[node name="CodeEdit" type="CodeEdit" parent="VBoxContainer"]
-layout_mode = 2
-size_flags_vertical = 3
+theme_override_constants/side_margin = 0
+theme_override_constants/icon_separation = 0
+theme_override_constants/outline_size = 0
+tabs_visible = false
