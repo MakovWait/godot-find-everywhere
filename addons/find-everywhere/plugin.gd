@@ -1,8 +1,8 @@
 @tool
 extends EditorPlugin
 
-const DoubleClick = preload("res://addons/find-everywhere/triggers/double_click.gd")
-const PluginPopup: PackedScene = preload("res://addons/find-everywhere/popup.tscn")
+const DoubleClick = preload("res://addons/find-everywhere/src/triggers/double_click.gd")
+const PluginPopup: PackedScene = preload("res://addons/find-everywhere/src/popup.tscn")
 
 var _popup_trigger
 var _popup_dialog
@@ -16,14 +16,16 @@ func _enter_tree() -> void:
 	_popup_dialog = PluginPopup.instantiate()
 	get_editor_interface().get_base_control().add_child(_popup_dialog)
 	
-	_popup_dialog.add_tab(
-		"Open", 
-		preload("res://addons/find-everywhere/tabs/quick_open/quick_open.tscn").instantiate()
-	)
-	_popup_dialog.add_tab(
-		"Find",
-		preload("res://addons/find-everywhere/tabs/find_in_files/find_in_files.tscn").instantiate()
-	)
+	var quick_open = preload(
+		"res://addons/find-everywhere/src/tabs/quick_open/quick_open.tscn"
+	).instantiate()
+	quick_open.editor_interface = get_editor_interface()
+	_popup_dialog.add_tab("Open", quick_open)
+	
+	var find_in_files = preload(
+		"res://addons/find-everywhere/src/tabs/find_in_files/find_in_files.tscn"
+	).instantiate()
+	_popup_dialog.add_tab("Find", find_in_files)
 
 
 func _exit_tree() -> void:

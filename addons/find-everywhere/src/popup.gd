@@ -27,9 +27,12 @@ func add_tab(name, control):
 	if name in _tabs:
 		push_error("Tab %s is already registered" % name)
 		return
-	var tab_control = Control.new()
-	tab_control.add_child(control)
 	
+	control.set("parent_popup", self)
+	
+#	var tab_control = Control.new()
+#	tab_control.add_child(control)
+	var tab_control = control
 	var tab_button = TabButton.new()
 	tab_button.tab_container = _tab_container
 	tab_button.tab_control = tab_control
@@ -39,8 +42,8 @@ func add_tab(name, control):
 	_header_container.add_child(tab_button)
 	
 	_tabs[name] = {
-		"control": tab_control,
-		"button": tab_button
+		"tab_control": tab_control,
+		"tab_button": tab_button,
 	}
 
 
@@ -48,9 +51,10 @@ func remove_tab(name):
 	if not name in _tabs:
 		push_error("Unknown tab %s" % name)
 		return
+	
 	var clear_data = _tabs[name]
-	clear_data["control"].queue_free()
-	clear_data["button"].queue_free()
+	clear_data["tab_control"].queue_free()
+	clear_data["tab_button"].queue_free()
 
 
 class TabButton extends Button:
@@ -70,6 +74,9 @@ class TabButton extends Button:
 	
 		if tab_container.current_tab == _get_tab_idx():
 			set_pressed_no_signal(true)
+		
+#		add_theme_font_override("font", get_theme_font("main_button_font", "EditorFonts"))
+#		add_theme_font_size_override("font_size", get_theme_font_size("main_button_font_size", "EditorFonts"))
 	
 	func _get_tab_idx():
 		return tab_container.get_tab_idx_from_control(tab_control)
