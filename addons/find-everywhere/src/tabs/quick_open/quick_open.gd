@@ -33,7 +33,7 @@ func _tab_setup(popup):
 	)
 	var root = _search_options.create_item()
 	_tree_section_recent = _search_create_section(root, "Recent")
-	_tree_section_results = _search_create_section(root, "Found")
+	_tree_section_results = _search_create_section(root, "Files")
 	
 	_line_edit.clear_button_enabled = true
 	_line_edit.focus_neighbor_bottom = _line_edit.get_path()
