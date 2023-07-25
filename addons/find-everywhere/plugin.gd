@@ -16,10 +16,19 @@ func _enter_tree() -> void:
 	_popup_dialog = PluginPopup.instantiate()
 	get_editor_interface().get_base_control().add_child(_popup_dialog)
 	
+#	var quick_open = preload(
+#		"res://addons/find-everywhere/src/tabs/quick_open/quick_open.tscn"
+#	).instantiate()
+#	quick_open.script = load("res://addons/find-everywhere/src/tabs/quick_open/quick_open.gd")
+#	quick_open.editor_interface = get_editor_interface()
+
 	var quick_open = preload(
-		"res://addons/find-everywhere/src/tabs/quick_open/quick_open.tscn"
-	).instantiate()
-	quick_open.editor_interface = get_editor_interface()
+		"res://addons/find-everywhere/src/tabs/quick_open/link.gd"
+	).get_quick_open(get_editor_interface())
+	
+#	var quick_open = load("res://addons/find-everywhere/src/tabs/quick_open/quick_open.gd").new()
+#	quick_open.editor_interface = get_editor_interface()
+	
 	_popup_dialog.add_tab("Open", quick_open)
 	
 	var find_in_files = preload(

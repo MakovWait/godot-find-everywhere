@@ -6,6 +6,9 @@ var editor_interface: EditorInterface
 @onready var _line_edit: LineEdit = $LineEdit
 @onready var _search_options: Tree = $SearchOptions
 
+#var _line_edit: LineEdit
+#var _search_options: Tree
+
 var _files = []
 var _queued_to_rebuild_cache = false
 var _icon_by_extension = {}
@@ -16,6 +19,15 @@ var _parent_popup: ConfirmationDialog
 
 var _tree_section_recent
 var _tree_section_results
+
+
+#func _init() -> void:
+#	_line_edit = LineEdit.new()
+#	add_child(_line_edit)
+#
+#	_search_options = Tree.new()
+#	_search_options.size_flags_vertical = Control.SIZE_EXPAND_FILL
+#	add_child(_search_options)
 
 
 func _tab_setup(popup):
@@ -149,6 +161,9 @@ func _search_create_section(root, item_name):
 	section.set_text(0, item_name)
 	section.set_selectable(0, false)
 	section.set_custom_bg_color(0, _search_options.get_theme_color(StringName("prop_subsection"), StringName("Editor")))
+	theme_changed.connect(func():
+		section.set_custom_bg_color(0, _search_options.get_theme_color(StringName("prop_subsection"), StringName("Editor")))
+	)
 	return section
 
 
