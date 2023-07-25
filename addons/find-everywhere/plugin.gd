@@ -32,8 +32,8 @@ func _enter_tree() -> void:
 	_popup_dialog.add_tab("Open", quick_open)
 	
 	var find_in_files = preload(
-		"res://addons/find-everywhere/src/tabs/find_in_files/find_in_files.tscn"
-	).instantiate()
+		"res://addons/find-everywhere/src/tabs/find_in_files/link.gd"
+	).get_find_in_files(get_editor_interface())
 	_popup_dialog.add_tab("Find", find_in_files)
 
 
