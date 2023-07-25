@@ -1,50 +1,41 @@
 @tool
 extends VBoxContainer
 
-var parent_popup: ConfirmationDialog
 var editor_interface: EditorInterface
 
 @onready var _line_edit: LineEdit = $LineEdit
 @onready var _search_options: Tree = $SearchOptions
 
 var _files = []
+var _queued_to_rebuild_cache = false
 var _icon_by_extension = {}
 var _default_icon
+var _recent_opened = []
+var _parent_popup: ConfirmationDialog
 
 
-func _ready() -> void:
-	parent_popup.confirmed.connect(func():
-		if not _search_options.get_selected():
-			return
-		var selected_path = "res://" + _search_options.get_selected().get_text(0)
-		var scene_extensions = ResourceLoader.get_recognized_extensions_for_type("PackedScene")
-		if selected_path.get_extension() in scene_extensions:
-			editor_interface.open_scene_from_path(selected_path)
-		else:
-			if ResourceLoader.exists(selected_path):
-				editor_interface.edit_resource(load(selected_path))
-		editor_interface.get_file_system_dock().navigate_to_path(selected_path)
-	)
-	parent_popup.register_text_enter(_line_edit)
+var _tree_section_recent
+var _tree_section_results
+
+
+func _tab_setup(popup):
+	_parent_popup = popup
+	_parent_popup.register_text_enter(_line_edit)
 	
-	visibility_changed.connect(func():
-		if is_visible_in_tree():
-			_line_edit.grab_focus()
-	)
-	_line_edit.text_changed.connect(func(_new_text):
-		_update_search()
-	)
 	_update_theme()
 	theme_changed.connect(_update_theme)
 
-	_search_options.hide_folding = true
+	_search_options.hide_folding = false
 	_search_options.hide_root = true
 	_search_options.add_theme_constant_override("draw_guides", 1)
-	_search_options.create_item()
 	_search_options.gui_input.connect(func(event):
 		_line_edit.grab_focus()
 	)
+	var root = _search_options.create_item()
+	_tree_section_recent = _search_create_section(root, "Recent")
+	_tree_section_results = _search_create_section(root, "Found")
 	
+	_line_edit.clear_button_enabled = true
 	_line_edit.focus_neighbor_bottom = _line_edit.get_path()
 	_line_edit.focus_neighbor_top = _line_edit.get_path()
 	_line_edit.gui_input.connect(func(event):
@@ -54,15 +45,37 @@ func _ready() -> void:
 			match k.keycode:
 				KEY_UP, KEY_DOWN, KEY_PAGEDOWN, KEY_PAGEUP:
 					_search_options.grab_focus()
+					_line_edit.accept_event()
 					var e = event.duplicate()
 					e.set_meta("___quick_open_line_edit_handled___", true)
 					Input.parse_input_event(e)
 	)
-	
-	_build_search_cache(
-		editor_interface.get_resource_filesystem().get_filesystem()
+	_line_edit.text_changed.connect(func(_new_text):
+		_update_search()
 	)
+	
+	editor_interface.get_resource_filesystem().filesystem_changed.connect(func():
+		_queued_to_rebuild_cache = true
+	)
+	
+	_rebuild_search_cache()
 	_update_search()
+
+
+func _tab_focus():
+	_line_edit.grab_focus()
+	_line_edit.select_all()
+	_parent_popup.confirmed.connect(_on_popup_confirmed)
+	
+	_update_recent()
+	if _queued_to_rebuild_cache:
+		_rebuild_search_cache()
+		_update_search()
+
+
+func _tab_blur():
+	if _parent_popup.is_connected("confirmed", _on_popup_confirmed):
+		_parent_popup.confirmed.disconnect(_on_popup_confirmed)
 
 
 func _update_theme():
@@ -82,18 +95,15 @@ func _update_search():
 				"score": _score_path(search_text, file.to_lower())
 			})
 	
-	var root = _search_options.get_root()
-	for child in root.get_children():
-		root.remove_child(child)
-		child.free()
-	
+	var search_results = _tree_section_results
+	_clear_tree_item_children(search_results)
 	if len(entries) > 0:
 		if not empty_search:
 			entries.sort_custom(func(a, b): return a.score > b.score)
 		
 		var entry_limit = min(len(entries), 300)
 		for i in entry_limit:
-			var item = _search_options.create_item(root)
+			var item = _search_options.create_item(search_results)
 			item.set_text(0, entries[i].path)
 			item.set_icon(
 				0, 
@@ -103,13 +113,49 @@ func _update_search():
 				)
 			)
 
-
-		var to_select = root.get_first_child()
+		var to_select = search_results.get_first_child()
 		to_select.select(0)
 #		to_select.set_as_cursor(0)
 		_search_options.scroll_to_item(to_select)
 	else:
 		_search_options.deselect_all()
+
+
+func _update_recent():
+	var recent = _tree_section_recent
+	_clear_tree_item_children(recent)
+	for recent_item in _recent_opened:
+		var item = _search_options.create_item(recent)
+		item.set_selectable(0, ResourceLoader.exists(recent_item))
+		item.set_text(0, recent_item.substr(6, len(recent_item)))
+		item.set_icon(
+			0, 
+			_icon_by_extension.get(
+				recent_item.get_extension(), 
+				_default_icon
+			)
+		)
+	var select_if_can = func(idx):
+		if idx < 0 or idx >= len(_recent_opened):
+			return
+		var to_select = recent.get_child(idx)
+		to_select.select(0)
+		_search_options.scroll_to_item(to_select)
+	select_if_can.call(min(1, len(_recent_opened) - 1))
+
+
+func _search_create_section(root, item_name):
+	var section = _search_options.create_item(root)
+	section.set_text(0, item_name)
+	section.set_selectable(0, false)
+	section.set_custom_bg_color(0, _search_options.get_theme_color(StringName("prop_subsection"), StringName("Editor")))
+	return section
+
+
+func _clear_tree_item_children(item):
+	for child in item.get_children():
+		item.remove_child(child)
+		child.free()
 
 
 func _score_path(search, path):
@@ -129,6 +175,12 @@ func _score_path(search, path):
 	return path.to_lower().similarity(search.to_lower());
 
 
+func _rebuild_search_cache():
+	_files.clear()
+	_build_search_cache(editor_interface.get_resource_filesystem().get_filesystem())
+	_queued_to_rebuild_cache = false
+
+
 func _build_search_cache(dir: EditorFileSystemDirectory):
 	for i in dir.get_subdir_count():
 		_build_search_cache(dir.get_subdir(i))
@@ -143,13 +195,33 @@ func _build_search_cache(dir: EditorFileSystemDirectory):
 		for parent_type in ["Resource"]:
 			if ClassDB.is_parent_class(engine_type, parent_type):
 				_files.push_back(file.substr(6, file.length()))
-			    break
+				break
+
+
+func _on_popup_confirmed():
+	if not _search_options.get_selected():
+		return
+	var selected_path = "res://" + _search_options.get_selected().get_text(0)
+	var scene_extensions = ResourceLoader.get_recognized_extensions_for_type("PackedScene")
+	if selected_path.get_extension() in scene_extensions:
+		editor_interface.open_scene_from_path(selected_path)
+	else:
+		if ResourceLoader.exists(selected_path):
+			editor_interface.edit_resource(load(selected_path))
+	editor_interface.get_file_system_dock().navigate_to_path(selected_path)
+	
+	var recent_path_idx = _recent_opened.find(selected_path)
+	if recent_path_idx != -1:
+		_recent_opened.remove_at(recent_path_idx)
+	_recent_opened.push_front(selected_path)
+	if len(_recent_opened) > 5:
+		_recent_opened.pop_back()
 
 
 func _fill_icons():
 	_default_icon = get_theme_icon(StringName("Object"), StringName("EditorIcons"))
 	
-	https://github.com/godotengine/godot/blob/f6187014ec1d7a47b7201f64f3a8376a5da2f42d/editor/editor_asset_installer.cpp#L97
+	#https://github.com/godotengine/godot/blob/f6187014ec1d7a47b7201f64f3a8376a5da2f42d/editor/editor_asset_installer.cpp#L97
 	_icon_by_extension.clear()
 	_icon_by_extension["bmp"] = get_theme_icon(StringName("ImageTexture"), StringName("EditorIcons"))
 	_icon_by_extension["dds"] = get_theme_icon(StringName("ImageTexture"), StringName("EditorIcons"))

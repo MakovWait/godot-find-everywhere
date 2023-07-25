@@ -7,13 +7,19 @@ extends ConfirmationDialog
 var _prev_rect
 var _tabs = {}
 
+var _prev_tab_idx = null
+
 
 func _ready() -> void:
 	visibility_changed.connect(func():
+		if visible:
+			_handle_tab_changed(_tab_container.current_tab)
 		if not visible:
 			_prev_rect = Rect2i(position, size)
 	)
+	
 	_tab_container.tabs_visible = false
+	_tab_container.tab_changed.connect(_handle_tab_changed)
 
 
 func raise(edscale):
@@ -28,8 +34,6 @@ func add_tab(name, control):
 		push_error("Tab %s is already registered" % name)
 		return
 	
-	control.set("parent_popup", self)
-	
 #	var tab_control = Control.new()
 #	tab_control.add_child(control)
 	var tab_control = control
@@ -41,7 +45,10 @@ func add_tab(name, control):
 	_tab_container.add_child(tab_control)
 	_header_container.add_child(tab_button)
 	
+	_call_lifecycle_method(tab_control, "_tab_setup", [self])
+	
 	_tabs[name] = {
+		"tab_idx": _tab_container.get_tab_idx_from_control(tab_control),
 		"tab_control": tab_control,
 		"tab_button": tab_button,
 	}
@@ -55,6 +62,33 @@ func remove_tab(name):
 	var clear_data = _tabs[name]
 	clear_data["tab_control"].queue_free()
 	clear_data["tab_button"].queue_free()
+	_tabs.erase(name)
+
+
+func _handle_tab_changed(idx):
+	var prev_tab = _find_tab_control_by_idx(_prev_tab_idx)
+	var current_tab = _find_tab_control_by_idx(idx)
+	
+	_call_lifecycle_method(prev_tab, "_tab_blur")
+	_call_lifecycle_method(current_tab, "_tab_focus")
+	
+	_prev_tab_idx = idx
+
+
+func _find_tab_control_by_idx(idx):
+	if idx == null:
+		return null
+	for value in _tabs.values():
+		if value.tab_idx == idx:
+			return value.tab_control
+	return null
+
+
+func _call_lifecycle_method(obj, method_name, args=[]):
+	if obj == null:
+		return
+	if obj.has_method(method_name):
+		obj.callv(method_name, args)
 
 
 class TabButton extends Button:
