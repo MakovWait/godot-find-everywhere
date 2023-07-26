@@ -1,9 +1,9 @@
 @tool
 extends VBoxContainer
 
-const LINE_EDIT_DEBOUNCE_TIME_MSEC = 800
+const LINE_EDIT_DEBOUNCE_TIME_MSEC = 300
 const FindInFilesCoroutine = preload(
-	"res://addons/find-everywhere/src/tabs/find_in_files/find_in_files_coroutine.gd"
+	"res://addons/find-everywhere/src/tabs/find_in_files/find_in_files_coroutine2.gd"
 )
 
 var editor_interface: EditorInterface
@@ -87,6 +87,7 @@ func _tab_blur():
 
 func _update_search():
 	_clear_tree_item_children(_search_options.get_root())
+	_search_coroutine.editor_filesystem = editor_interface.get_resource_filesystem()
 	_search_coroutine.search_text = _line_edit.text
 	_search_coroutine.extension_filter = ["gd"]
 #	_search_coroutine.extension_filter = ["md"]
