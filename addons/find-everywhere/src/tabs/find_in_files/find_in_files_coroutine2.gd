@@ -29,12 +29,14 @@ var _queued_to_rebuild_cache = true
 func _ready() -> void:
 	set_process(false)
 
-	editor_filesystem.filesystem_changed.connect(func():
-		_queued_to_rebuild_cache = true
-	)
+
+func _on_filesystem_changed():
+	_queued_to_rebuild_cache = true
 
 
 func start():
+	if not editor_filesystem.filesystem_changed.is_connected(_on_filesystem_changed):
+		editor_filesystem.filesystem_changed.connect(_on_filesystem_changed)
 	if search_text.is_empty():
 		print_verbose("Nothing to search, pattern is empty")
 		finished.emit()
@@ -81,11 +83,13 @@ func _build_search_cache(dir: EditorFileSystemDirectory):
 #		var actual_type = script_type.is_empty() ? engine_type : script_type
 		var actual_type = engine_type
 		
-		if extension_filter.has(file.get_extension()):
+		if file.get_extension() in ["gd", "gdshader", "tscn"]:
 			_files.push_back(file)
 
 
 func _scan_file(fpath):
+	if not extension_filter.has(fpath.get_extension()):
+		return
 	var f = FileAccess.open(fpath, FileAccess.READ)
 	if f == null:
 		print_verbose(String("Cannot open file ") + fpath)
@@ -94,7 +98,7 @@ func _scan_file(fpath):
 	var iteration_start = Time.get_ticks_usec()
 	var line_number = 0
 	while f.get_position() < f.get_length():
-		++line_number
+		line_number += 1
 		var line = f.get_line()
 		_scan_line(fpath, line, line_number)
 

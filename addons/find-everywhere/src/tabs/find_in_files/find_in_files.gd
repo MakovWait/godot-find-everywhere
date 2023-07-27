@@ -10,11 +10,23 @@ var editor_interface: EditorInterface
 
 @onready var _search_options: Tree = %SearchOptions
 @onready var _code_edit: CodeEdit = %CodeEdit
-@onready var _line_edit: LineEdit = $LineEdit
+@onready var _line_edit: LineEdit = %LineEdit
+@onready var _file_name_label: Label = %FileNameLabel
+@onready var _file_path_label: Label = %FilePathLabel
+@onready var _check_boxes: HBoxContainer = %CheckBoxes
+@onready var _line_edit_options: HBoxContainer = %LineEditOptions
+@onready var _search_history_button: Button = %SearchHistoryButton
 
 var _parent_popup: ConfirmationDialog
 var _search_coroutine: FindInFilesCoroutine
 var _line_edit_debounce: Timer
+
+var _whole_words = false
+var _match_case = false
+var _extension_filter = []
+var _folder = ""
+
+var _is_ready = false
 
 
 func _init() -> void:
@@ -28,6 +40,43 @@ func _init() -> void:
 	_search_coroutine = FindInFilesCoroutine.new()
 	_search_coroutine.result_found.connect(_on_result_found)
 	add_child(_search_coroutine)
+
+
+func _ready() -> void:
+	_file_path_label.clip_text = true
+	_file_path_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_file_path_label.structured_text_bidi_override = TextServer.STRUCTURED_TEXT_FILE
+	
+	var add_filter = func(filter_name):
+		return func(toggled):
+			var found_filter_idx = _extension_filter.find(filter_name)
+			if found_filter_idx != -1:
+				_extension_filter.remove_at(found_filter_idx)
+			if toggled:
+				_extension_filter.append(filter_name)
+			_update_search()
+	
+	var set_property = func(prop_name):
+		return func(toggled):
+			self.set(prop_name, toggled)
+			_update_search()
+			
+	_add_search_toggle_button("W", false, set_property.call("_whole_words"))
+	_add_search_toggle_button("Cc", false, set_property.call("_match_case"))
+	_add_search_toggle_button(".*", false, set_property.call("_match_case"))
+
+#	_add_search_checkbox("gd", true, add_filter.call("gd"))
+#	_add_search_checkbox("tscn", true, add_filter.call("tscn"))
+#	_add_search_checkbox("gdshader", false, add_filter.call("gdshader"))
+
+	var extensions_button = OptionButton.new()
+	extensions_button.flat = true
+	extensions_button.fit_to_longest_item = false
+	extensions_button.add_item("gd", 0)
+	extensions_button.add_item("tscn", 1)
+	extensions_button.add_item("gdshader", 2)
+	_line_edit_options.add_child(extensions_button)
+	
 
 
 func _tab_setup(popup):
@@ -58,21 +107,41 @@ func _tab_setup(popup):
 		)
 	)
 
+	_search_options.item_selected.connect(_on_tree_item_selected)
 	_search_options.hide_folding = true
 	_search_options.hide_root = true
 	_search_options.add_theme_constant_override("draw_guides", 1)
 	_search_options.gui_input.connect(func(event):
 		_line_edit.grab_focus()
 	)
+	_search_options.columns = 3
 	_search_options.create_item()
+	_search_options.select_mode = Tree.SELECT_ROW
+	
+	_search_options.set_column_expand_ratio(0, 4)
+	_search_options.set_column_expand(0, true)
+	_search_options.set_column_expand(1, true)
+	_search_options.set_column_expand(2, false)
+	_search_options.set_column_clip_content(0, true)
+	_search_options.set_column_clip_content(1, true)
+	_search_options.scroll_horizontal_enabled = false
 
-	_code_edit.text = get_script().source_code
 	_code_edit.draw_tabs = true
 	_code_edit.gutters_draw_line_numbers = true
 	_code_edit.scroll_smooth = true
+#	_code_edit.set("theme_override_styles/read_only", StyleBoxEmpty.new())
+#	_code_edit.add_theme_stylebox_override("read_only", StyleBoxEmpty.new())
+	_code_edit.editable = false
+	
+	_is_ready = true
 
 
 func _tab_focus():
+	var script_editor = _get_current_script_editor()
+	if script_editor:
+		var syntax_highlighter = script_editor.syntax_highlighter
+		_code_edit.syntax_highlighter = syntax_highlighter
+	
 	_line_edit.grab_focus()
 	_line_edit.select_all()
 	_parent_popup.confirmed.connect(_on_popup_confirmed)
@@ -86,41 +155,144 @@ func _tab_blur():
 
 
 func _update_search():
+	if not _is_ready:
+		return
 	_clear_tree_item_children(_search_options.get_root())
 	_search_coroutine.editor_filesystem = editor_interface.get_resource_filesystem()
 	_search_coroutine.search_text = _line_edit.text
-	_search_coroutine.extension_filter = ["gd"]
+	_search_coroutine.extension_filter = _extension_filter
+	_search_coroutine.match_case = _match_case
+#	_search_coroutine.extension_filter = ["tscn"]
 #	_search_coroutine.extension_filter = ["md"]
-	_search_coroutine.whole_words = false
-	_search_coroutine.folder = ""
+	_search_coroutine.whole_words = _whole_words
+	_search_coroutine.folder = _folder
 	_search_coroutine.stop()
 	_search_coroutine.start()
 
 
-func _on_result_found(fpath, line_number, begin, end, line):
+func _on_tree_item_selected():
+	var selected_item = _search_options.get_selected()
+	if selected_item and selected_item.has_meta("params"):
+		var params = selected_item.get_meta("params")
+		var file = FileAccess.open(params.fpath, FileAccess.READ)
+		if file:
+			var content = file.get_as_text()
+			_code_edit.text = content
+			_goto_line_selection(
+				_code_edit, 
+				params.line_number - 1, 
+				params.begin, 
+				params.end
+			)
+			_file_path_label.text = params.fpath.get_base_dir()
+			_file_name_label.text = params.fpath.get_file()
+
+
+func _on_result_found(fpath: String, line_number: int, begin: int, end: int, line: String):
 	var root = _search_options.get_root()
 	var item = _search_options.create_item()
 	item.set_text(0, line)
+	item.set_text(1, fpath.get_file())
+	item.set_text(2, str(line_number))
+	item.set_text_alignment(1, HORIZONTAL_ALIGNMENT_RIGHT)
+	item.set_meta('params', {
+		'fpath': fpath,
+		'line_number': line_number,
+		'begin': begin,
+		'end': end,
+		'line': line
+	})
+	if root.get_child_count() == 1:
+		item.select(0)
+		_search_options.scroll_to_item(item, true)
 
 
 func _on_popup_confirmed():
 	if not _search_options.get_selected():
 		return
-	var selected_path = "res://" + _search_options.get_selected().get_text(0)
+	var selected_params = _search_options.get_selected().get_meta("params")
+	var selected_path: String =  selected_params.fpath
 	var scene_extensions = ResourceLoader.get_recognized_extensions_for_type("PackedScene")
 	if selected_path.get_extension() in scene_extensions:
 		editor_interface.open_scene_from_path(selected_path)
 	else:
-		if ResourceLoader.exists(selected_path):
-			editor_interface.edit_resource(load(selected_path))
+		var resource = load(selected_path)
+		if resource is Script:
+			editor_interface.edit_script(
+				resource, 
+				selected_params.line_number,
+				selected_params.begin
+			)
+		elif ResourceLoader.exists(selected_path):
+			editor_interface.edit_resource(resource)
+		if "TextFile" in str(resource) or resource is Script:
+			var editor = _get_current_script_editor() as CodeEdit
+			if editor:
+				_goto_line_selection(
+					editor, 
+					selected_params.line_number - 1, 
+					selected_params.begin, 
+					selected_params.end
+				)
+			
 	editor_interface.get_file_system_dock().navigate_to_path(selected_path)
 
 
 func _update_theme():
-	_line_edit.right_icon = get_theme_icon("Search", "EditorIcons")
+#	_line_edit.right_icon = get_theme_icon("Search", "EditorIcons")
+	_search_history_button.icon = get_theme_icon("Search", "EditorIcons")
+	_line_edit.right_icon = null
+	_line_edit.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	_file_path_label.add_theme_color_override(
+		"font_color",
+		get_theme_color("font_color", "Tree")
+	)
+	_file_name_label.add_theme_color_override(
+		"font_color",
+		get_theme_color("font_color", "Tree")
+	)
 
 
 func _clear_tree_item_children(item):
 	for child in item.get_children():
 		item.remove_child(child)
 		child.free()
+
+
+func _get_current_script_editor():
+	var script_editor = editor_interface.get_script_editor()
+	if script_editor.get_current_editor():
+		if script_editor.get_current_editor().get_base_editor():
+			var editor = script_editor.get_current_editor().get_base_editor()
+			return editor
+	return null
+
+
+func _add_search_checkbox(cname, button_pressed, on_toggled):
+	var check_box = CheckBox.new()
+	check_box.text = cname
+	check_box.toggled.connect(on_toggled)
+	check_box.button_pressed = button_pressed
+	_check_boxes.add_child(check_box)
+
+
+func _add_search_toggle_button(bname, button_pressed, on_toggled):
+	var button = Button.new()
+	button.text = bname
+	button.button_pressed = button_pressed
+	button.flat = true
+	button.toggle_mode = true
+	button.toggled.connect(func(toggled):
+		on_toggled.call(toggled)
+		_line_edit.grab_focus()
+	)
+	_line_edit_options.add_child(button)
+#	_check_boxes.add_child(check_box)
+
+
+func _goto_line_selection(text_editor: CodeEdit, p_line: int, p_begin: int, p_end: int):
+	text_editor.remove_secondary_carets()
+	text_editor.unfold_line(p_line)
+	text_editor.call_deferred("set_caret_line", p_line)
+	text_editor.call_deferred("set_caret_column", p_end)
+	text_editor.select(p_line, p_begin, p_line, p_end)
