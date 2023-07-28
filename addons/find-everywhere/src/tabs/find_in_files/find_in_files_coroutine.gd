@@ -7,173 +7,140 @@ signal finished
 var search_text = ""
 var match_case = false
 var whole_words = false
-var folder = ""
-var extension_filter = []
-var max_results_found = 20
+var regex = false
+var max_results = INF
+var editor_filesystem: EditorFileSystem
 
-var _current_dir = ""
-var _folders_stack = []
-var _files_to_scan = []
-var _initial_files_count = 0
-var _searching = false
-var _results_found = 0
+var folder = "":
+	set(value):
+		if folder != value:
+			_queued_to_rebuild_cache = true
+		folder = value
+
+var extension_filter = []:
+	set(value):
+		if extension_filter != value:
+			_queued_to_rebuild_cache = true
+		extension_filter = value
+
+var _files = []
+var _current_file_idx = 0
+var _queued_to_rebuild_cache = true
+var _compiled_regex: RegEx = RegEx.new()
+var _found_results_number = 0
 
 
-func _init() -> void:
+func _ready() -> void:
 	set_process(false)
+	result_found.connect(func(_a, _b, _c, _d, _e):
+		_found_results_number += 1
+	)
+
+
+func _on_filesystem_changed():
+	_queued_to_rebuild_cache = true
 
 
 func start():
+	if not editor_filesystem.filesystem_changed.is_connected(_on_filesystem_changed):
+		editor_filesystem.filesystem_changed.connect(_on_filesystem_changed)
+	
 	if search_text.is_empty():
 		print_verbose("Nothing to search, pattern is empty")
 		finished.emit()
+		return
 	
 	if len(extension_filter) == 0:
 		print_verbose("Nothing to search, filter matches no files")
 		finished.emit()
+		return
+
+	if regex:
+		var err = _compiled_regex.compile(search_text)
+		if err:
+			print_verbose("Nothing to search, regex is not valid")
+			finished.emit()
+			return
+
+	if _queued_to_rebuild_cache:
+		_files.clear()
+		var fsp = editor_filesystem.get_filesystem_path(folder)
+		if fsp:
+			_build_search_cache(fsp)
+		_queued_to_rebuild_cache = false
 	
-	_results_found = 0
-	_current_dir = ""
-	var init_folder = []
-	init_folder.push_back(folder)
-	_folders_stack.clear()
-	_folders_stack.push_back(init_folder)
-
-	_initial_files_count = 0
-
-	_searching = true
+	_found_results_number = 0
+	_current_file_idx = 0
 	set_process(true)
 
 
 func stop():
-	_searching = false
-	_current_dir = ""
 	set_process(false)
 
 
 func _process(delta: float) -> void:
 	var time_before = Time.get_ticks_usec()
-	while(is_processing()):
-		_iterate()
+	while _current_file_idx < len(_files) and is_processing():
+		_scan_file(_files[_current_file_idx])
+		_current_file_idx += 1
 		var elapsed = Time.get_ticks_usec() - time_before
 		if elapsed > 8:
-			break
+			return
+	set_process(false)
+	finished.emit()
 
 
-func _iterate():
-	if _folders_stack.size() != 0:
-		# Scan folders first so we can build a list of files and have progress info later.
+func _build_search_cache(dir: EditorFileSystemDirectory):
+	for i in dir.get_subdir_count():
+		_build_search_cache(dir.get_subdir(i))
 
-		var folders_to_scan = _folders_stack[_folders_stack.size() - 1]
-
-		if folders_to_scan.size() != 0:
-			# Scan one folder below.
-
-			var folder_name = folders_to_scan[folders_to_scan.size() - 1]
-			folders_to_scan.resize(len(folders_to_scan) - 1)
-
-			_current_dir = _current_dir.path_join(folder_name)
-
-			var sub_dirs = _scan_dir("res://" + _current_dir)
-
-			_folders_stack.push_back(sub_dirs)
-
-		else:
-			# Go back one level.
-			_folders_stack.resize(len(_folders_stack) - 1)
-			_current_dir = _current_dir.get_base_dir()
-			if _folders_stack.size() == 0:
-				# All folders scanned.
-				_initial_files_count = _files_to_scan.size()
-	elif _files_to_scan.size() != 0:
-		# Then scan files.
-
-		var fpath = _files_to_scan[_files_to_scan.size() - 1]
-		_files_to_scan.resize(len(_files_to_scan) - 1)
-		_scan_file(fpath)
-
-	else:
-		print_verbose("Search complete")
-		set_process(false)
-		_current_dir = ""
-		_searching = false
-		finished.emit()
-
-
-func _scan_dir(path):
-	var out_folders = []
-	var dir = DirAccess.open(path)
-	if dir == null:
-		print_verbose("Cannot open directory! " + path)
-		return out_folders
-
-	dir.list_dir_begin()
-	for i in range(1000):
-		var file = dir.get_next()
-
-		if file.is_empty():
-			break
-
-		# If there is a .gdignore file in the directory, skip searching the directory.
-		if file == ".gdignore":
-			break
-
-		# Ignore special directories (such as those beginning with . and the project data directory).
-#		var project_data_dir_name = ProjectSettings.get_project_data_dir_name()
-#		if file.begins_with(".") || file == project_data_dir_name:
-		if file.begins_with("."):
-			continue
-#		if dir.current_is_hidden():
-#			continue
+	for i in dir.get_file_count():
+		var file = dir.get_file_path(i)
+		var engine_type = dir.get_file_type(i)
+#		var script_type = dir.get_file_resource_script_class(i)
+#		var actual_type = script_type.is_empty() ? engine_type : script_type
+		var actual_type = engine_type
 		
-		if dir.current_is_dir():
-			out_folders.push_back(file)
-		else:
-			var file_ext = file.get_extension()
-			if extension_filter.has(file_ext):
-				_files_to_scan.push_back(path.path_join(file))
-	return out_folders
+		if file.get_extension() in ["gd", "gdshader", "tscn"]:
+			_files.push_back(file)
 
 
 func _scan_file(fpath):
+	if not extension_filter.has(fpath.get_extension()):
+		return
 	var f = FileAccess.open(fpath, FileAccess.READ)
 	if f == null:
 		print_verbose(String("Cannot open file ") + fpath)
 		return
-
+	
+	var iteration_start = Time.get_ticks_usec()
 	var line_number = 0
-
-	while not f.eof_reached():
-		# Line number starts at 1.
-		++line_number
-
-		var begin = {'value': 0}
-		var end = {'value': 0}
-
+	while f.get_position() < f.get_length():
+		line_number += 1
 		var line = f.get_line()
-
-#		while find_next(line, search_text, end, match_case, whole_words, begin, end):
-		for _i in range(10000): 
-			if find_next(line, search_text, end.value, match_case, whole_words, begin, end):
-				result_found.emit(fpath, line_number, begin.value, end.value, line)
-				_results_found += 1
-				if _results_found >= max_results_found:
-					return
+		_scan_line(fpath, line, line_number)
+		if _found_results_number >= max_results:
+			stop()
+			return
 
 
-static func find_next(line, pattern, from, match_case, whole_words, out_begin, out_end):
-	var end = from
-
-#	while true:
-	for _i in range(10000):
-		var begin = line.find(pattern, end) if match_case else line.findn(pattern, end)
+func _scan_line(fpath: String, line: String, line_number: int):
+	if regex:
+		var regex_match = _compiled_regex.search(line)
+		if regex_match:
+			var begin = regex_match.get_start()
+			var end = regex_match.get_end()
+			result_found.emit(fpath, line_number, begin, end, line)
+		return
+		
+	var end = 0
+	while true:
+		var begin = line.find(search_text, end) if match_case else line.findn(search_text, end)
 
 		if begin == -1:
-			return false
+			return
 
-		end = begin + pattern.length()
-		out_begin.value = begin
-		out_end.value = end
+		end = begin + search_text.length()
 
 		if whole_words:
 			if begin > 0 && (is_ascii_identifier_char(line[begin - 1])):
@@ -181,8 +148,9 @@ static func find_next(line, pattern, from, match_case, whole_words, out_begin, o
 			if end < len(line) && (is_ascii_identifier_char(line[end])):
 				continue
 
-		return true
+		result_found.emit(fpath, line_number, begin, end, line)
+		return
 
 
-static func is_ascii_identifier_char(c):
+static func is_ascii_identifier_char(c: String) -> bool:
 	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_'

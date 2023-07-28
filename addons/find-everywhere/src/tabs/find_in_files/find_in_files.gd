@@ -3,7 +3,7 @@ extends VBoxContainer
 
 const LINE_EDIT_DEBOUNCE_TIME_MSEC = 300
 const FindInFilesCoroutine = preload(
-	"res://addons/find-everywhere/src/tabs/find_in_files/find_in_files_coroutine2.gd"
+	"res://addons/find-everywhere/src/tabs/find_in_files/find_in_files_coroutine.gd"
 )
 
 var editor_interface: EditorInterface
@@ -121,6 +121,7 @@ func _ready() -> void:
 	
 	_parent_popup = get_parent()
 	_parent_popup.register_text_enter(_line_edit)
+	_parent_popup.confirmed.connect(_open_selected_item)
 	
 	visibility_changed.connect(func():
 		if is_visible_in_tree():
@@ -157,12 +158,9 @@ func focus():
 	
 	_line_edit.grab_focus()
 	_line_edit.select_all()
-	_parent_popup.confirmed.connect(_open_selected_item)
 
 
 func blur():
-	if _parent_popup.is_connected("confirmed", _open_selected_item):
-		_parent_popup.confirmed.disconnect(_open_selected_item)
 	_search_coroutine.stop()
 	_line_edit_debounce.stop()
 
@@ -216,6 +214,7 @@ func _on_result_found(fpath: String, line_number: int, begin: int, end: int, lin
 
 
 func _open_selected_item():
+	print(_search_options.get_selected())
 	if not _search_options.get_selected():
 		return
 	var selected_params = _search_options.get_selected().get_meta("params")
