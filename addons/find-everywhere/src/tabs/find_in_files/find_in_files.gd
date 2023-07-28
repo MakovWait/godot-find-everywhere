@@ -19,6 +19,7 @@ var editor_interface: EditorInterface
 @onready var _file_dialog: FileDialog = $FileDialog
 @onready var _folder_button: Button = %FolderButton
 @onready var _folder_line_edit: LineEdit = %FolderLineEdit
+@onready var _code_edit_editable_check: CheckBox = %CodeEditEditableCheckBox
 
 var _parent_popup: ConfirmationDialog
 var _search_coroutine: FindInFilesCoroutine
@@ -112,12 +113,26 @@ func _ready() -> void:
 	_search_options.set_column_clip_content(1, true)
 	_search_options.scroll_horizontal_enabled = false
 
+
+	_code_edit_editable_check.toggled.connect(func(pressed):
+		_code_edit.editable = pressed
+	)
+	
 	_code_edit.draw_tabs = true
 	_code_edit.gutters_draw_line_numbers = true
 	_code_edit.scroll_smooth = true
 #	_code_edit.set("theme_override_styles/read_only", StyleBoxEmpty.new())
 #	_code_edit.add_theme_stylebox_override("read_only", StyleBoxEmpty.new())
 	_code_edit.editable = false
+	_code_edit.focus_exited.connect(func():
+		if not _code_edit.editable:
+			return
+		var selected_params = _search_options.get_selected().get_meta("params")
+		var selected_path: String =  selected_params.fpath
+		var file = FileAccess.open(selected_path, FileAccess.WRITE)
+		if file:
+			file.store_string(_code_edit.text)
+	)
 	
 	_parent_popup = get_parent()
 	_parent_popup.register_text_enter(_line_edit)
@@ -214,7 +229,6 @@ func _on_result_found(fpath: String, line_number: int, begin: int, end: int, lin
 
 
 func _open_selected_item():
-	print(_search_options.get_selected())
 	if not _search_options.get_selected():
 		return
 	var selected_params = _search_options.get_selected().get_meta("params")
