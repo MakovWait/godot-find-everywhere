@@ -16,17 +16,13 @@ var editor_interface: EditorInterface
 @onready var _check_boxes: HBoxContainer = %CheckBoxes
 @onready var _line_edit_options: HBoxContainer = %LineEditOptions
 @onready var _search_history_button: Button = %SearchHistoryButton
+@onready var _file_dialog: FileDialog = $FileDialog
+@onready var _folder_button: Button = %FolderButton
+@onready var _folder_line_edit: LineEdit = %FolderLineEdit
 
 var _parent_popup: ConfirmationDialog
 var _search_coroutine: FindInFilesCoroutine
 var _line_edit_debounce: Timer
-
-var _whole_words = false
-var _match_case = false
-var _extension_filter = []
-var _folder = ""
-
-var _is_ready = false
 
 
 func _init() -> void:
@@ -49,39 +45,26 @@ func _ready() -> void:
 	
 	var add_filter = func(filter_name):
 		return func(toggled):
-			var found_filter_idx = _extension_filter.find(filter_name)
+			var filters = self._search_coroutine.extension_filter
+			var found_filter_idx = filters.find(filter_name)
 			if found_filter_idx != -1:
-				_extension_filter.remove_at(found_filter_idx)
+				filters.remove_at(found_filter_idx)
 			if toggled:
-				_extension_filter.append(filter_name)
+				filters.append(filter_name)
 			_update_search()
 	
 	var set_property = func(prop_name):
 		return func(toggled):
-			self.set(prop_name, toggled)
+			self._search_coroutine.set(prop_name, toggled)
 			_update_search()
-			
-	_add_search_toggle_button("W", false, set_property.call("_whole_words"))
-	_add_search_toggle_button("Cc", false, set_property.call("_match_case"))
-	_add_search_toggle_button(".*", false, set_property.call("_match_case"))
-
-#	_add_search_checkbox("gd", true, add_filter.call("gd"))
-#	_add_search_checkbox("tscn", true, add_filter.call("tscn"))
-#	_add_search_checkbox("gdshader", false, add_filter.call("gdshader"))
-
-	var extensions_button = OptionButton.new()
-	extensions_button.flat = true
-	extensions_button.fit_to_longest_item = false
-	extensions_button.add_item("gd", 0)
-	extensions_button.add_item("tscn", 1)
-	extensions_button.add_item("gdshader", 2)
-	_line_edit_options.add_child(extensions_button)
 	
+	_add_search_toggle_button("W", false, set_property.call("whole_words"), "Words")
+	_add_search_toggle_button("Cc", false, set_property.call("match_case"), "Match case")
+	_add_search_toggle_button(".*", false, set_property.call("regex"), "Regex")
 
-
-func _tab_setup(popup):
-	_parent_popup = popup
-	_parent_popup.register_text_enter(_line_edit)
+	_add_search_checkbox("gd", true, add_filter.call("gd"))
+	_add_search_checkbox("tscn", true, add_filter.call("tscn"))
+	_add_search_checkbox("gdshader", false, add_filter.call("gdshader"))
 	
 	_update_theme()
 	theme_changed.connect(_update_theme)
@@ -108,16 +91,19 @@ func _tab_setup(popup):
 	)
 
 	_search_options.item_selected.connect(_on_tree_item_selected)
+	_search_options.item_activated.connect(func():
+		_parent_popup.hide()
+		_open_selected_item()
+	)
+	_search_options.gui_input.connect(func(_event): 
+		_line_edit.grab_focus()
+	)
 	_search_options.hide_folding = true
 	_search_options.hide_root = true
 	_search_options.add_theme_constant_override("draw_guides", 1)
-	_search_options.gui_input.connect(func(event):
-		_line_edit.grab_focus()
-	)
 	_search_options.columns = 3
 	_search_options.create_item()
 	_search_options.select_mode = Tree.SELECT_ROW
-	
 	_search_options.set_column_expand_ratio(0, 4)
 	_search_options.set_column_expand(0, true)
 	_search_options.set_column_expand(1, true)
@@ -133,10 +119,37 @@ func _tab_setup(popup):
 #	_code_edit.add_theme_stylebox_override("read_only", StyleBoxEmpty.new())
 	_code_edit.editable = false
 	
-	_is_ready = true
+	_parent_popup = get_parent()
+	_parent_popup.register_text_enter(_line_edit)
+	
+	visibility_changed.connect(func():
+		if is_visible_in_tree():
+			focus()
+		else:
+			blur()
+	)
+	
+	_file_dialog.file_mode = FileDialog.FILE_MODE_OPEN_DIR
+	_file_dialog.dir_selected.connect(func(path):
+		var i = path.find("://");
+		if i != -1:
+			path = path.substr(i + 3)
+		_folder_line_edit.text = path
+		_search_coroutine.folder = path
+		_update_search()
+	)
+	
+	_folder_line_edit.focus_exited.connect(func():
+		_search_coroutine.folder = "res://" + _folder_line_edit.text
+		_update_search()
+	)
+	
+	_folder_button.pressed.connect(func():
+		_file_dialog.popup_centered_clamped(Vector2i(700, 500), 0.8)
+	)
 
 
-func _tab_focus():
+func focus():
 	var script_editor = _get_current_script_editor()
 	if script_editor:
 		var syntax_highlighter = script_editor.syntax_highlighter
@@ -144,28 +157,23 @@ func _tab_focus():
 	
 	_line_edit.grab_focus()
 	_line_edit.select_all()
-	_parent_popup.confirmed.connect(_on_popup_confirmed)
+	_parent_popup.confirmed.connect(_open_selected_item)
 
 
-func _tab_blur():
-	if _parent_popup.is_connected("confirmed", _on_popup_confirmed):
-		_parent_popup.confirmed.disconnect(_on_popup_confirmed)
+func blur():
+	if _parent_popup.is_connected("confirmed", _open_selected_item):
+		_parent_popup.confirmed.disconnect(_open_selected_item)
 	_search_coroutine.stop()
 	_line_edit_debounce.stop()
 
 
 func _update_search():
-	if not _is_ready:
+	if not is_node_ready():
 		return
 	_clear_tree_item_children(_search_options.get_root())
 	_search_coroutine.editor_filesystem = editor_interface.get_resource_filesystem()
 	_search_coroutine.search_text = _line_edit.text
-	_search_coroutine.extension_filter = _extension_filter
-	_search_coroutine.match_case = _match_case
-#	_search_coroutine.extension_filter = ["tscn"]
-#	_search_coroutine.extension_filter = ["md"]
-	_search_coroutine.whole_words = _whole_words
-	_search_coroutine.folder = _folder
+	_search_coroutine.max_results = 200
 	_search_coroutine.stop()
 	_search_coroutine.start()
 
@@ -207,7 +215,7 @@ func _on_result_found(fpath: String, line_number: int, begin: int, end: int, lin
 		_search_options.scroll_to_item(item, true)
 
 
-func _on_popup_confirmed():
+func _open_selected_item():
 	if not _search_options.get_selected():
 		return
 	var selected_params = _search_options.get_selected().get_meta("params")
@@ -234,7 +242,6 @@ func _on_popup_confirmed():
 					selected_params.begin, 
 					selected_params.end
 				)
-			
 	editor_interface.get_file_system_dock().navigate_to_path(selected_path)
 
 
@@ -254,6 +261,8 @@ func _update_theme():
 
 
 func _clear_tree_item_children(item):
+	if not item: 
+		return
 	for child in item.get_children():
 		item.remove_child(child)
 		child.free()
@@ -276,8 +285,9 @@ func _add_search_checkbox(cname, button_pressed, on_toggled):
 	_check_boxes.add_child(check_box)
 
 
-func _add_search_toggle_button(bname, button_pressed, on_toggled):
+func _add_search_toggle_button(bname, button_pressed, on_toggled, tooltip=""):
 	var button = Button.new()
+	button.tooltip_text = tooltip
 	button.text = bname
 	button.button_pressed = button_pressed
 	button.flat = true

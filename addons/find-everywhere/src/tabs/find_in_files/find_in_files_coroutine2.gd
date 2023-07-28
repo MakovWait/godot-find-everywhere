@@ -7,6 +7,8 @@ signal finished
 var search_text = ""
 var match_case = false
 var whole_words = false
+var regex = false
+var max_results = INF
 var editor_filesystem: EditorFileSystem
 
 var folder = "":
@@ -24,10 +26,15 @@ var extension_filter = []:
 var _files = []
 var _current_file_idx = 0
 var _queued_to_rebuild_cache = true
+var _compiled_regex: RegEx = RegEx.new()
+var _found_results_number = 0
 
 
 func _ready() -> void:
 	set_process(false)
+	result_found.connect(func(_a, _b, _c, _d, _e):
+		_found_results_number += 1
+	)
 
 
 func _on_filesystem_changed():
@@ -37,6 +44,7 @@ func _on_filesystem_changed():
 func start():
 	if not editor_filesystem.filesystem_changed.is_connected(_on_filesystem_changed):
 		editor_filesystem.filesystem_changed.connect(_on_filesystem_changed)
+	
 	if search_text.is_empty():
 		print_verbose("Nothing to search, pattern is empty")
 		finished.emit()
@@ -46,12 +54,22 @@ func start():
 		print_verbose("Nothing to search, filter matches no files")
 		finished.emit()
 		return
-	
+
+	if regex:
+		var err = _compiled_regex.compile(search_text)
+		if err:
+			print_verbose("Nothing to search, regex is not valid")
+			finished.emit()
+			return
+
 	if _queued_to_rebuild_cache:
 		_files.clear()
-		_build_search_cache(editor_filesystem.get_filesystem_path(folder))
+		var fsp = editor_filesystem.get_filesystem_path(folder)
+		if fsp:
+			_build_search_cache(fsp)
 		_queued_to_rebuild_cache = false
 	
+	_found_results_number = 0
 	_current_file_idx = 0
 	set_process(true)
 
@@ -101,9 +119,20 @@ func _scan_file(fpath):
 		line_number += 1
 		var line = f.get_line()
 		_scan_line(fpath, line, line_number)
+		if _found_results_number >= max_results:
+			stop()
+			return
 
 
 func _scan_line(fpath: String, line: String, line_number: int):
+	if regex:
+		var regex_match = _compiled_regex.search(line)
+		if regex_match:
+			var begin = regex_match.get_start()
+			var end = regex_match.get_end()
+			result_found.emit(fpath, line_number, begin, end, line)
+		return
+		
 	var end = 0
 	while true:
 		var begin = line.find(search_text, end) if match_case else line.findn(search_text, end)
