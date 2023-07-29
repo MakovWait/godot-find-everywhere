@@ -1,6 +1,9 @@
 @tool
 extends VBoxContainer
 
+const TIP_EMPTY_SEARCH_QUERY = "Type search query to find in files."
+const TIP_NOTHING_FOUND = "Nothing found."
+
 const LINE_EDIT_DEBOUNCE_TIME_MSEC = 300
 const FindInFilesCoroutine = preload(
 	"res://addons/find-everywhere/src/tabs/find_in_files/find_in_files_coroutine.gd"
@@ -20,6 +23,9 @@ var editor_interface: EditorInterface
 @onready var _folder_button: Button = %FolderButton
 @onready var _folder_line_edit: LineEdit = %FolderLineEdit
 @onready var _code_edit_editable_check: CheckBox = %CodeEditEditableCheckBox
+@onready var _tip_container: Control = %TipContainer
+@onready var _tip_label: Label = _tip_container.get_node("Label")
+@onready var _search_results_container: Control = %SearchResultsContainer
 
 var _parent_popup: ConfirmationDialog
 var _search_coroutine: FindInFilesCoroutine
@@ -41,6 +47,8 @@ func _init() -> void:
 
 
 func _ready() -> void:
+	_set_tip_visible(true, TIP_EMPTY_SEARCH_QUERY)
+	
 	_file_path_label.clip_text = true
 	_file_path_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_file_path_label.structured_text_bidi_override = TextServer.STRUCTURED_TEXT_FILE
@@ -138,6 +146,9 @@ func _ready() -> void:
 	_parent_popup = get_parent()
 	_parent_popup.register_text_enter(_line_edit)
 	_parent_popup.confirmed.connect(_open_selected_item)
+	_parent_popup.get_ok_button().hide()
+	_parent_popup.get_cancel_button().hide()
+	_parent_popup.title = "Find in Files"
 	
 	visibility_changed.connect(func():
 		if is_visible_in_tree():
@@ -196,6 +207,12 @@ func _set_code_edit_editable(value):
 	_code_edit_editable_check.button_pressed = value
 
 
+func _set_tip_visible(value, tip=""):
+	_tip_container.visible = value
+	_tip_label.text = tip
+	_search_results_container.visible = not value
+
+
 func _add_to_last_search(value):
 	if len(_last_search_history) > 5:
 		_last_search_history.pop_back()
@@ -205,7 +222,11 @@ func _add_to_last_search(value):
 func _update_search():
 	if not is_node_ready():
 		return
+	if _line_edit.text.is_empty():
+		_set_tip_visible(true, TIP_EMPTY_SEARCH_QUERY)
+		return
 	_clear_tree_item_children(_search_options.get_root())
+	_set_tip_visible(true, TIP_NOTHING_FOUND)
 	_search_coroutine.editor_filesystem = editor_interface.get_resource_filesystem()
 	_search_coroutine.search_text = _line_edit.text
 	_search_coroutine.max_results = 200
@@ -233,6 +254,7 @@ func _on_tree_item_selected():
 
 
 func _on_result_found(fpath: String, line_number: int, begin: int, end: int, line: String):
+	_set_tip_visible(false)
 	var root = _search_options.get_root()
 	var item = _search_options.create_item()
 	
