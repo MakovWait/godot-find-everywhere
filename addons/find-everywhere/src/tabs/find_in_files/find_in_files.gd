@@ -15,7 +15,7 @@ var editor_interface: EditorInterface
 @onready var _file_path_label: Label = %FilePathLabel
 @onready var _check_boxes: HBoxContainer = %CheckBoxes
 @onready var _line_edit_options: HBoxContainer = %LineEditOptions
-@onready var _search_history_button: Button = %SearchHistoryButton
+@onready var _search_history_button: MenuButton = %SearchHistoryButton
 @onready var _file_dialog: FileDialog = $FileDialog
 @onready var _folder_button: Button = %FolderButton
 @onready var _folder_line_edit: LineEdit = %FolderLineEdit
@@ -24,6 +24,7 @@ var editor_interface: EditorInterface
 var _parent_popup: ConfirmationDialog
 var _search_coroutine: FindInFilesCoroutine
 var _line_edit_debounce: Timer
+var _last_search_history = []
 
 
 func _init() -> void:
@@ -113,7 +114,6 @@ func _ready() -> void:
 	_search_options.set_column_clip_content(1, true)
 	_search_options.scroll_horizontal_enabled = false
 
-
 	_code_edit_editable_check.toggled.connect(func(pressed):
 		_set_code_edit_editable(pressed)
 	)
@@ -164,6 +164,11 @@ func _ready() -> void:
 	_folder_button.pressed.connect(func():
 		_file_dialog.popup_centered_clamped(Vector2i(700, 500), 0.8)
 	)
+	
+	_search_history_button.get_popup().index_pressed.connect(func(idx):
+		_line_edit.text = _search_history_button.get_popup().get_item_text(idx)
+		_update_search()
+	)
 
 
 func focus():
@@ -174,16 +179,27 @@ func focus():
 	
 	_line_edit.grab_focus()
 	_line_edit.select_all()
+	
+	_search_history_button.get_popup().clear()
+	for line in _last_search_history:
+		_search_history_button.get_popup().add_item(line)
 
 
 func blur():
 	_search_coroutine.stop()
 	_line_edit_debounce.stop()
+	_last_search_history.append(_line_edit.text)
 
 
 func _set_code_edit_editable(value):
 	_code_edit.editable = value
 	_code_edit_editable_check.button_pressed = value
+
+
+func _add_to_last_search(value):
+	if len(_last_search_history) > 5:
+		_last_search_history.pop_back()
+	_last_search_history.push_front(value)
 
 
 func _update_search():
