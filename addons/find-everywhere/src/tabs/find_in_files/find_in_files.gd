@@ -115,7 +115,7 @@ func _ready() -> void:
 
 
 	_code_edit_editable_check.toggled.connect(func(pressed):
-		_code_edit.editable = pressed
+		_set_code_edit_editable(pressed)
 	)
 	
 	_code_edit.draw_tabs = true
@@ -132,6 +132,7 @@ func _ready() -> void:
 		var file = FileAccess.open(selected_path, FileAccess.WRITE)
 		if file:
 			file.store_string(_code_edit.text)
+		_set_code_edit_editable(false)
 	)
 	
 	_parent_popup = get_parent()
@@ -180,6 +181,11 @@ func blur():
 	_line_edit_debounce.stop()
 
 
+func _set_code_edit_editable(value):
+	_code_edit.editable = value
+	_code_edit_editable_check.button_pressed = value
+
+
 func _update_search():
 	if not is_node_ready():
 		return
@@ -192,6 +198,7 @@ func _update_search():
 
 
 func _on_tree_item_selected():
+	_set_code_edit_editable(false)
 	var selected_item = _search_options.get_selected()
 	if selected_item and selected_item.has_meta("params"):
 		var params = selected_item.get_meta("params")
