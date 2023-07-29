@@ -81,11 +81,8 @@ text = "bla bla bla"
 unique_name_in_owner = true
 modulate = Color(1, 1, 1, 0.498039)
 layout_mode = 2
-text = "bla bla bla"
-
-[node name="Spacer" type="Control" parent="VSplitContainer/VBoxContainer/HBoxContainer"]
-layout_mode = 2
 size_flags_horizontal = 3
+text = "bla bla bla bla bla bla bla bla bla bla bla bla"
 
 [node name="CodeEditEditableCheckBox" type="CheckBox" parent="VSplitContainer/VBoxContainer/HBoxContainer"]
 unique_name_in_owner = true
