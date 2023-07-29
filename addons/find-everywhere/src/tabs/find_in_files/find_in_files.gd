@@ -212,20 +212,49 @@ func _on_tree_item_selected():
 func _on_result_found(fpath: String, line_number: int, begin: int, end: int, line: String):
 	var root = _search_options.get_root()
 	var item = _search_options.create_item()
-	item.set_text(0, line)
+	
+	var old_text_size = len(line)
+	var text = line.strip_edges(true, false)
+	var chars_removed = old_text_size - len(text)
+	item.set_cell_mode(0, TreeItem.CELL_MODE_CUSTOM)
+	item.set_text(0, text)
+	item.set_custom_draw(0, self, "_draw_result_text")
+	
 	item.set_text(1, fpath.get_file())
 	item.set_text(2, str(line_number))
 	item.set_text_alignment(1, HORIZONTAL_ALIGNMENT_RIGHT)
+
+	item.set_custom_color(1, _search_options.get_theme_color("font_color") * Color(1, 1, 1, 0.5))
+	item.set_custom_color(2, _search_options.get_theme_color("font_color") * Color(1, 1, 1, 0.6))
+	
 	item.set_meta('params', {
 		'fpath': fpath,
 		'line_number': line_number,
 		'begin': begin,
+		'begin_trimmed': max(0, begin - chars_removed),
 		'end': end,
+		'end_trimmed': max(0, end - chars_removed),
 		'line': line
 	})
 	if root.get_child_count() == 1:
 		item.select(0)
 		_search_options.scroll_to_item(item, true)
+
+
+func _draw_result_text(item: TreeItem, rect: Rect2):
+	if not item.has_meta("params"):
+		return
+	var item_text = item.get_text(0)
+	var font = _search_options.get_theme_font(StringName("font"))
+	var font_size = _search_options.get_theme_font_size(StringName("font_size"))
+	var match_rect = rect
+	var r = item.get_meta("params")
+	match_rect.position.x += font.get_string_size(item_text.left(r.begin_trimmed), HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x - 1
+	match_rect.size.x = font.get_string_size(item_text.substr(r.begin_trimmed, r.end_trimmed - r.begin_trimmed), HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x + 1
+	match_rect.position.y += 1 * editor_interface.get_editor_scale()
+	match_rect.size.y -= 2 * editor_interface.get_editor_scale()
+	_search_options.draw_rect(match_rect, get_theme_color("accent_color", "Editor") * Color(1, 1, 1, 0.33), false, 2.0)
+	_search_options.draw_rect(match_rect, get_theme_color("accent_color", "Editor") * Color(1, 1, 1, 0.17), true)
 
 
 func _open_selected_item():
