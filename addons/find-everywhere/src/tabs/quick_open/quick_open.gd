@@ -30,9 +30,10 @@ var _tree_section_results
 #	add_child(_search_options)
 
 
-func _tab_setup(popup):
-	_parent_popup = popup
+func _ready() -> void:
+	_parent_popup = get_parent()
 	_parent_popup.register_text_enter(_line_edit)
+	_parent_popup.confirmed.connect(_on_popup_confirmed)
 	
 	_update_theme()
 	theme_changed.connect(_update_theme)
@@ -70,14 +71,20 @@ func _tab_setup(popup):
 		_queued_to_rebuild_cache = true
 	)
 	
+	visibility_changed.connect(func():
+		if is_visible_in_tree():
+			focus()
+		else:
+			blur()
+	)
+	
 	_rebuild_search_cache()
 	_update_search()
 
 
-func _tab_focus():
+func focus():
 	_line_edit.grab_focus()
 	_line_edit.select_all()
-	_parent_popup.confirmed.connect(_on_popup_confirmed)
 	
 	_update_recent()
 	if _queued_to_rebuild_cache:
@@ -85,9 +92,8 @@ func _tab_focus():
 		_update_search()
 
 
-func _tab_blur():
-	if _parent_popup.is_connected("confirmed", _on_popup_confirmed):
-		_parent_popup.confirmed.disconnect(_on_popup_confirmed)
+func blur():
+	pass
 
 
 func _update_theme():

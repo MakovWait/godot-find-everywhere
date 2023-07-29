@@ -15,4 +15,4 @@ func raise(edscale):
 	if _prev_rect:
 		popup(_prev_rect)
 	else:
-		popup_centered_clamped(Vector2(600, 440) * edscale, 0.8)
+		popup_centered_clamped(Vector2(600, 800) * edscale, 0.8)
