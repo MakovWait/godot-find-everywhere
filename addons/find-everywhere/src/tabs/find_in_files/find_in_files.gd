@@ -125,7 +125,7 @@ func _ready() -> void:
 	_code_edit_editable_check.toggled.connect(func(pressed):
 		_set_code_edit_editable(pressed)
 	)
-	
+
 	_code_edit.draw_tabs = true
 	_code_edit.gutters_draw_line_numbers = true
 	_code_edit.scroll_smooth = true
@@ -187,6 +187,11 @@ func focus():
 	if script_editor:
 		var syntax_highlighter = script_editor.syntax_highlighter
 		_code_edit.syntax_highlighter = syntax_highlighter
+	if script_editor is TextEdit:
+		var selected_text = script_editor.get_selected_text()
+		if not selected_text.is_empty() and _line_edit.text != selected_text:
+			_line_edit.text = selected_text
+			_update_search()
 	
 	_line_edit.grab_focus()
 	_line_edit.select_all()
@@ -250,6 +255,8 @@ func _on_tree_item_selected():
 				params.end
 			)
 			_file_path_label.text = params.fpath.get_base_dir()
+			_file_path_label.tooltip_text = params.fpath.get_base_dir()
+			_file_name_label.tooltip_text = params.fpath.get_file()
 			_file_name_label.text = params.fpath.get_file()
 
 
