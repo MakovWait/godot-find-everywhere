@@ -1,33 +1,23 @@
 @tool
 extends VBoxContainer
 
+const QuickOpenSectinBase = preload(
+	"res://addons/find-everywhere/src/tabs/quick_open/quick_open_section_base.gd"
+)
+
 var editor_interface: EditorInterface
 
 @onready var _line_edit: LineEdit = $LineEdit
 @onready var _search_options: Tree = $SearchOptions
 
-#var _line_edit: LineEdit
-#var _search_options: Tree
-
 var _files = []
+var _dirs = []
 var _queued_to_rebuild_cache = false
 var _icon_by_extension = {}
 var _default_icon
-var _recent_opened = []
 var _parent_popup: ConfirmationDialog
-
-
-var _tree_section_recent
-var _tree_section_results
-
-
-#func _init() -> void:
-#	_line_edit = LineEdit.new()
-#	add_child(_line_edit)
-#
-#	_search_options = Tree.new()
-#	_search_options.size_flags_vertical = Control.SIZE_EXPAND_FILL
-#	add_child(_search_options)
+var _sections = {}
+var _sections_order = []
 
 
 func _ready() -> void:
@@ -41,12 +31,12 @@ func _ready() -> void:
 	_search_options.hide_folding = false
 	_search_options.hide_root = true
 	_search_options.add_theme_constant_override("draw_guides", 1)
+	_search_options.columns = 2
+	_search_options.select_mode = Tree.SELECT_ROW
 	_search_options.gui_input.connect(func(event):
 		_line_edit.grab_focus()
 	)
-	var root = _search_options.create_item()
-	_tree_section_recent = _search_create_section(root, "Recent")
-	_tree_section_results = _search_create_section(root, "Files")
+	_search_options.create_item()
 	
 	_line_edit.clear_button_enabled = true
 	_line_edit.focus_neighbor_bottom = _line_edit.get_path()
@@ -78,15 +68,23 @@ func _ready() -> void:
 			blur()
 	)
 	
+	add_section("files", _update_files_search)
+	add_section("dirs", _update_dirs_search)
+	
 	_rebuild_search_cache()
 	_update_search()
+
+
+func add_section(section_name, section):
+	_sections[section_name] = section
+	_sections_order.push_back(section_name)
 
 
 func focus():
 	_line_edit.grab_focus()
 	_line_edit.select_all()
 	
-	_update_recent()
+#	_update_recent()
 	if _queued_to_rebuild_cache:
 		_rebuild_search_cache()
 		_update_search()
@@ -102,9 +100,26 @@ func _update_theme():
 
 
 func _update_search():
-	var search_text = _line_edit.text
-	var empty_search = search_text.is_empty()
+	_clear_tree_item_children(_search_options.get_root())
 	
+	var search_text = _line_edit.text
+	
+	for section_name in _sections_order:
+		var section = _sections[section_name]
+		if section is Callable:
+			section.call(search_text, _search_options)
+		else:
+			section.update_search(search_text, _search_options)
+	
+	var to_select = _search_options.get_root().get_first_child()
+	if not to_select:
+		return
+	to_select.select(0)
+	_search_options.scroll_to_item(to_select)
+
+
+func _update_files_search(search_text: String, search_options: Tree):
+	var empty_search = search_text.is_empty()
 	var entries = []
 	for file in _files:
 		if empty_search or search_text.is_subsequence_ofn(file):
@@ -112,17 +127,22 @@ func _update_search():
 				"path": file,
 				"score": _score_path(search_text, file.to_lower())
 			})
-	
-	var search_results = _tree_section_results
-	_clear_tree_item_children(search_results)
+
 	if len(entries) > 0:
 		if not empty_search:
 			entries.sort_custom(func(a, b): return a.score > b.score)
-		
+
 		var entry_limit = min(len(entries), 300)
 		for i in entry_limit:
-			var item = _search_options.create_item(search_results)
-			item.set_text(0, entries[i].path)
+			var item = search_options.create_item(search_options.get_root())
+			item.set_meta("on_activate", func():
+				_open_file(item)
+			)
+			item.set_meta("full_path", entries[i].path)
+			item.set_text(0, entries[i].path.get_file())
+			item.set_text(1, entries[i].path.get_base_dir())
+			item.set_custom_color(1, _search_options.get_theme_color("font_color") * Color(1, 1, 1, 0.5))
+			item.set_text_alignment(1, HORIZONTAL_ALIGNMENT_RIGHT)
 			item.set_icon(
 				0, 
 				_icon_by_extension.get(
@@ -131,46 +151,27 @@ func _update_search():
 				)
 			)
 
-		var to_select = search_results.get_first_child()
-		to_select.select(0)
-#		to_select.set_as_cursor(0)
-		_search_options.scroll_to_item(to_select)
-	else:
-		_search_options.deselect_all()
 
+func _update_dirs_search(search_text: String, search_options: Tree):
+	var empty_search = search_text.is_empty()
+	var entries = []
+	for dir in _dirs:
+		if empty_search or search_text.is_subsequence_ofn(dir.name):
+			entries.push_back(dir)
 
-func _update_recent():
-	var recent = _tree_section_recent
-	_clear_tree_item_children(recent)
-	for recent_item in _recent_opened:
-		var item = _search_options.create_item(recent)
-		item.set_selectable(0, ResourceLoader.exists(recent_item))
-		item.set_text(0, recent_item.substr(6, len(recent_item)))
-		item.set_icon(
-			0, 
-			_icon_by_extension.get(
-				recent_item.get_extension(), 
-				_default_icon
+	if len(entries) > 0:
+		var entry_limit = min(len(entries), 300)
+		for i in entry_limit:
+			var item = search_options.create_item(search_options.get_root())
+			item.set_meta("on_activate", func():
+				editor_interface.get_file_system_dock().navigate_to_path(entries[i].path)
 			)
-		)
-	var select_if_can = func(idx):
-		if idx < 0 or idx >= len(_recent_opened):
-			return
-		var to_select = recent.get_child(idx)
-		to_select.select(0)
-		_search_options.scroll_to_item(to_select)
-	select_if_can.call(min(1, len(_recent_opened) - 1))
-
-
-func _search_create_section(root, item_name):
-	var section = _search_options.create_item(root)
-	section.set_text(0, item_name)
-	section.set_selectable(0, false)
-	section.set_custom_bg_color(0, _search_options.get_theme_color(StringName("prop_subsection"), StringName("Editor")))
-	theme_changed.connect(func():
-		section.set_custom_bg_color(0, _search_options.get_theme_color(StringName("prop_subsection"), StringName("Editor")))
-	)
-	return section
+			item.set_text(0, entries[i].name)
+			item.set_text_alignment(1, HORIZONTAL_ALIGNMENT_RIGHT)
+			item.set_icon(
+				0, 
+				get_theme_icon("Folder", "EditorIcons")
+			)
 
 
 func _clear_tree_item_children(item):
@@ -198,14 +199,19 @@ func _score_path(search, path):
 
 func _rebuild_search_cache():
 	_files.clear()
+	_dirs.clear()
 	_build_search_cache(editor_interface.get_resource_filesystem().get_filesystem())
 	_queued_to_rebuild_cache = false
 
 
 func _build_search_cache(dir: EditorFileSystemDirectory):
+	_dirs.push_back({
+		'path': dir.get_path(),
+		'name': dir.get_name(),
+	})
 	for i in dir.get_subdir_count():
 		_build_search_cache(dir.get_subdir(i))
-
+	
 	for i in dir.get_file_count():
 		var file = dir.get_file_path(i)
 		var engine_type = dir.get_file_type(i)
@@ -222,7 +228,16 @@ func _build_search_cache(dir: EditorFileSystemDirectory):
 func _on_popup_confirmed():
 	if not _search_options.get_selected():
 		return
-	var selected_path = "res://" + _search_options.get_selected().get_text(0)
+	var selected = _search_options.get_selected()
+	if selected.has_meta("on_activate"):
+		var on_activate = selected.get_meta("on_activate")
+		on_activate.call()
+
+
+func _open_file(item):
+	if not item.has_meta("full_path"):
+		return
+	var selected_path = item.get_meta("full_path")
 	var scene_extensions = ResourceLoader.get_recognized_extensions_for_type("PackedScene")
 	if selected_path.get_extension() in scene_extensions:
 		editor_interface.open_scene_from_path(selected_path)
@@ -230,13 +245,6 @@ func _on_popup_confirmed():
 		if ResourceLoader.exists(selected_path):
 			editor_interface.edit_resource(load(selected_path))
 	editor_interface.get_file_system_dock().navigate_to_path(selected_path)
-	
-	var recent_path_idx = _recent_opened.find(selected_path)
-	if recent_path_idx != -1:
-		_recent_opened.remove_at(recent_path_idx)
-	_recent_opened.push_front(selected_path)
-	if len(_recent_opened) > 5:
-		_recent_opened.pop_back()
 
 
 func _fill_icons():
