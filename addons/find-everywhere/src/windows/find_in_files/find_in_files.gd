@@ -6,7 +6,7 @@ const TIP_NOTHING_FOUND = "Nothing found."
 
 const LINE_EDIT_DEBOUNCE_TIME_MSEC = 300
 const FindInFilesCoroutine = preload(
-	"res://addons/find-everywhere/src/tabs/find_in_files/find_in_files_coroutine.gd"
+	"res://addons/find-everywhere/src/windows/find_in_files/find_in_files_coroutine.gd"
 )
 
 var editor_interface: EditorInterface

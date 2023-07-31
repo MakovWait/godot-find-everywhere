@@ -22,6 +22,9 @@ func _ready() -> void:
 	_parent_popup = get_parent()
 	_parent_popup.register_text_enter(_line_edit)
 	_parent_popup.confirmed.connect(_on_popup_confirmed)
+	_parent_popup.get_ok_button().hide()
+	_parent_popup.get_cancel_button().hide()
+	_parent_popup.title = "Quick Open"
 	
 	_update_theme()
 	theme_changed.connect(_update_theme)

@@ -18,12 +18,12 @@ func _enter_tree() -> void:
 	_popup_trigger.triggered.connect(_show_popup)
 
 	_find_in_files_popup = preload(
-		"res://addons/find-everywhere/src/tabs/find_in_files/link.gd"
+		"res://addons/find-everywhere/src/windows/find_in_files/link.gd"
 	).get_find_in_files(get_editor_interface())
 	
 	_quick_open_popup = preload(
-		"res://addons/find-everywhere/src/tabs/quick_open/link.gd"
-	).get_quick_open(get_editor_interface())
+		"res://addons/find-everywhere/src/windows/quick_open/link.gd"
+	).get_quick_open(get_editor_interface(), [])
 	
 	var base_control = get_editor_interface().get_base_control()
 	base_control.add_child(_find_in_files_popup)
