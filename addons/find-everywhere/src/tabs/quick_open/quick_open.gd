@@ -70,6 +70,12 @@ func _ready() -> void:
 	
 	add_section("files", _update_files_search)
 	add_section("dirs", _update_dirs_search)
+#	add_section(
+#		"builtin-actions", 
+#		preload(
+#			"res://addons/find-everywhere/src/tabs/quick_open/command_palette_module.gd"
+#		).new(editor_interface)
+#	)
 	
 	_rebuild_search_cache()
 	_update_search()
@@ -103,13 +109,20 @@ func _update_search():
 	_clear_tree_item_children(_search_options.get_root())
 	
 	var search_text = _line_edit.text
-	
+	var entries = []
 	for section_name in _sections_order:
 		var section = _sections[section_name]
 		if section is Callable:
-			section.call(search_text, _search_options)
+			entries.append_array(section.call(search_text))
 		else:
-			section.update_search(search_text, _search_options)
+			entries.append_array(section.update_search(search_text))
+	
+	if not search_text.is_empty():
+		entries.sort_custom(func(a, b): return a.score > b.score)
+	
+	for i in range(min(300, len(entries))):
+		var e = entries[i]
+		entries[i]["to_tree_item"].call(_search_options)
 	
 	var to_select = _search_options.get_root().get_first_child()
 	if not to_select:
@@ -118,60 +131,56 @@ func _update_search():
 	_search_options.scroll_to_item(to_select)
 
 
-func _update_files_search(search_text: String, search_options: Tree):
+func _update_files_search(search_text: String):
 	var empty_search = search_text.is_empty()
 	var entries = []
 	for file in _files:
 		if empty_search or search_text.is_subsequence_ofn(file):
 			entries.push_back({
-				"path": file,
-				"score": _score_path(search_text, file.to_lower())
+				"score": _score_path(search_text, file.to_lower()),
+				"to_tree_item": func(search_options: Tree):
+					var item = search_options.create_item(search_options.get_root())
+					item.set_meta("on_activate", func():
+						_open_file(item)
+					)
+					item.set_meta("full_path", file)
+					item.set_text(0, file.get_file())
+					item.set_text(1, file.get_base_dir())
+		#			item.set_text(1, str(entries[i].score))
+					item.set_custom_color(1, _search_options.get_theme_color("font_color") * Color(1, 1, 1, 0.5))
+					item.set_text_alignment(1, HORIZONTAL_ALIGNMENT_RIGHT)
+					item.set_icon(
+						0, 
+						_icon_by_extension.get(
+							file.get_extension(), 
+							_default_icon
+						)
+					)
 			})
-
-	if len(entries) > 0:
-		if not empty_search:
-			entries.sort_custom(func(a, b): return a.score > b.score)
-
-		var entry_limit = min(len(entries), 300)
-		for i in entry_limit:
-			var item = search_options.create_item(search_options.get_root())
-			item.set_meta("on_activate", func():
-				_open_file(item)
-			)
-			item.set_meta("full_path", entries[i].path)
-			item.set_text(0, entries[i].path.get_file())
-			item.set_text(1, entries[i].path.get_base_dir())
-			item.set_custom_color(1, _search_options.get_theme_color("font_color") * Color(1, 1, 1, 0.5))
-			item.set_text_alignment(1, HORIZONTAL_ALIGNMENT_RIGHT)
-			item.set_icon(
-				0, 
-				_icon_by_extension.get(
-					entries[i].path.get_extension(), 
-					_default_icon
-				)
-			)
+	return entries
 
 
-func _update_dirs_search(search_text: String, search_options: Tree):
+
+func _update_dirs_search(search_text: String):
 	var empty_search = search_text.is_empty()
 	var entries = []
 	for dir in _dirs:
 		if empty_search or search_text.is_subsequence_ofn(dir.name):
-			entries.push_back(dir)
-
-	if len(entries) > 0:
-		var entry_limit = min(len(entries), 300)
-		for i in entry_limit:
-			var item = search_options.create_item(search_options.get_root())
-			item.set_meta("on_activate", func():
-				editor_interface.get_file_system_dock().navigate_to_path(entries[i].path)
-			)
-			item.set_text(0, entries[i].name)
-			item.set_text_alignment(1, HORIZONTAL_ALIGNMENT_RIGHT)
-			item.set_icon(
-				0, 
-				get_theme_icon("Folder", "EditorIcons")
-			)
+			entries.push_back({
+				"score": 1.2 if search_text.to_lower() == dir.name.to_lower() else 0.0,
+				"to_tree_item": func(search_options: Tree):
+					var item = search_options.create_item(search_options.get_root())
+					item.set_meta("on_activate", func():
+						editor_interface.get_file_system_dock().navigate_to_path(dir.path)
+					)
+					item.set_text(0, dir.name)
+					item.set_text_alignment(1, HORIZONTAL_ALIGNMENT_RIGHT)
+					item.set_icon(
+						0, 
+						get_theme_icon("Folder", "EditorIcons")
+					)
+			})
+	return entries
 
 
 func _clear_tree_item_children(item):
@@ -207,7 +216,7 @@ func _rebuild_search_cache():
 func _build_search_cache(dir: EditorFileSystemDirectory):
 	_dirs.push_back({
 		'path': dir.get_path(),
-		'name': dir.get_name(),
+		'name': "res://" if dir.get_name().is_empty() else dir.get_name(),
 	})
 	for i in dir.get_subdir_count():
 		_build_search_cache(dir.get_subdir(i))
