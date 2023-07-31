@@ -37,6 +37,7 @@ func _ready() -> void:
 	_search_options.gui_input.connect(func(event):
 		_line_edit.grab_focus()
 	)
+	_search_options.item_activated.connect(_on_popup_confirmed)
 	_search_options.create_item()
 	
 	_line_edit.clear_button_enabled = true
@@ -145,6 +146,7 @@ func _on_popup_confirmed():
 	if selected.has_meta("on_activate"):
 		var on_activate = selected.get_meta("on_activate")
 		on_activate.call()
+	_parent_popup.hide()
 
 
 func _update_theme():
@@ -166,7 +168,7 @@ func _update_files_search(search_text: String, output):
 					item.set_meta("on_activate", func():
 						_open_file(item)
 					)
-					item.set_meta("full_path", file)
+					item.set_meta("full_path", "res://" + file)
 					item.set_text(0, file.get_file())
 					item.set_text(1, file.get_base_dir())
 		#			item.set_text(1, str(entries[i].score))
