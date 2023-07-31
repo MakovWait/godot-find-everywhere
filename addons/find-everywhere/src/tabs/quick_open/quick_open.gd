@@ -197,13 +197,15 @@ func _score_path(search, path):
 		return 1.2
 
 	# Positive bias for matches close to the beginning of the file name.
-	var file = path.get_file();
-	var pos = file.findn(search);
+	var file = path.get_file()
+	if file.get_extension() != "gd":
+		score = score * 0.9
+	var pos = file.findn(search)
 	if pos != -1:
 		return score * (1.0 - 0.1 * (float(pos) / file.length()))
 
 	# Similarity
-	return path.to_lower().similarity(search.to_lower());
+	return path.to_lower().similarity(search.to_lower())
 
 
 func _rebuild_search_cache():
