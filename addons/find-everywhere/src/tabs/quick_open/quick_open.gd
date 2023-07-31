@@ -1,14 +1,14 @@
 @tool
 extends VBoxContainer
 
-const QuickOpenSectinBase = preload(
-	"res://addons/find-everywhere/src/tabs/quick_open/quick_open_section_base.gd"
-)
-
 var editor_interface: EditorInterface
+var search_sources_to_add = []
 
 @onready var _line_edit: LineEdit = $LineEdit
 @onready var _search_options: Tree = $SearchOptions
+
+var _auto_select_active = false
+var _search_result_sources = {}
 
 var _files = []
 var _dirs = []
@@ -16,8 +16,6 @@ var _queued_to_rebuild_cache = false
 var _icon_by_extension = {}
 var _default_icon
 var _parent_popup: ConfirmationDialog
-var _sections = {}
-var _sections_order = []
 
 
 func _ready() -> void:
@@ -48,6 +46,7 @@ func _ready() -> void:
 			match k.keycode:
 				KEY_UP, KEY_DOWN, KEY_PAGEDOWN, KEY_PAGEUP:
 					_search_options.grab_focus()
+					_auto_select_active = false
 					_line_edit.accept_event()
 					var e = event.duplicate()
 					e.set_meta("___quick_open_line_edit_handled___", true)
@@ -68,29 +67,24 @@ func _ready() -> void:
 			blur()
 	)
 	
-	add_section("files", _update_files_search)
-	add_section("dirs", _update_dirs_search)
-#	add_section(
-#		"builtin-actions", 
-#		preload(
-#			"res://addons/find-everywhere/src/tabs/quick_open/command_palette_module.gd"
-#		).new(editor_interface)
-#	)
+	_add_search_results_source("files", _update_files_search)
+	_add_search_results_source("dirs", _update_dirs_search)
+	for src in search_sources_to_add:
+		_add_search_results_source(src.name, src.handler)
 	
 	_rebuild_search_cache()
 	_update_search()
 
 
-func add_section(section_name, section):
-	_sections[section_name] = section
-	_sections_order.push_back(section_name)
+func _add_search_results_source(src_name, src):
+	_search_result_sources[src_name] = src
+	if src is Node:
+		src.add_child(src)
 
 
 func focus():
 	_line_edit.grab_focus()
 	_line_edit.select_all()
-	
-#	_update_recent()
 	if _queued_to_rebuild_cache:
 		_rebuild_search_cache()
 		_update_search()
@@ -100,46 +94,72 @@ func blur():
 	pass
 
 
+func add_search_result(result):
+	if is_reached_max_results():
+		return
+	var root = _search_options.get_root()
+	var idx = -1
+	for c_idx in root.get_child_count():
+		var c = root.get_child(c_idx)
+		if result["score"] > c.get_meta("score"):
+			idx = c_idx
+			break
+	var item: TreeItem = root.create_child(idx)
+	result["fill_tree_item"].call(item)
+	item.set_meta("score", result["score"])
+	
+	if _auto_select_active:
+		var to_select = _search_options.get_root().get_first_child()
+		if not to_select:
+			return
+		to_select.select(0)
+		_search_options.scroll_to_item(to_select)
+
+
+func is_reached_max_results():
+	return _search_options.get_root().get_child_count() >= 300
+
+
+func _update_search():
+	_auto_select_active = true
+	_clear_tree_item_children(_search_options.get_root())
+	
+	var search_text = _line_edit.text
+	for src in _search_result_sources.values():
+		if src is Callable:
+			src.call(search_text, self)
+		else:
+			src.update_search(search_text, self)
+
+
+func _on_popup_confirmed():
+	var selected = _if_null(
+		_search_options.get_selected(), 
+		_search_options.get_root().get_first_child()
+	)
+	if not selected:
+		return
+	if selected.has_meta("on_activate"):
+		var on_activate = selected.get_meta("on_activate")
+		on_activate.call()
+
+
 func _update_theme():
 	_fill_icons()
 	_line_edit.right_icon = get_theme_icon("Search", "EditorIcons")
 
 
-func _update_search():
-	_clear_tree_item_children(_search_options.get_root())
-	
-	var search_text = _line_edit.text
-	var entries = []
-	for section_name in _sections_order:
-		var section = _sections[section_name]
-		if section is Callable:
-			entries.append_array(section.call(search_text))
-		else:
-			entries.append_array(section.update_search(search_text))
-	
-	if not search_text.is_empty():
-		entries.sort_custom(func(a, b): return a.score > b.score)
-	
-	for i in range(min(300, len(entries))):
-		var e = entries[i]
-		entries[i]["to_tree_item"].call(_search_options)
-	
-	var to_select = _search_options.get_root().get_first_child()
-	if not to_select:
-		return
-	to_select.select(0)
-	_search_options.scroll_to_item(to_select)
-
-
-func _update_files_search(search_text: String):
+func _update_files_search(search_text: String, output):
 	var empty_search = search_text.is_empty()
-	var entries = []
 	for file in _files:
 		if empty_search or search_text.is_subsequence_ofn(file):
-			entries.push_back({
-				"score": _score_path(search_text, file.to_lower()),
-				"to_tree_item": func(search_options: Tree):
-					var item = search_options.create_item(search_options.get_root())
+			var scored_path = _score_path(search_text, file.to_lower())
+			var score = scored_path
+			if empty_search:
+				score = 0.1
+			output.add_search_result({
+				"score": score,
+				"fill_tree_item": func(item: TreeItem):
 					item.set_meta("on_activate", func():
 						_open_file(item)
 					)
@@ -157,19 +177,15 @@ func _update_files_search(search_text: String):
 						)
 					)
 			})
-	return entries
 
 
-
-func _update_dirs_search(search_text: String):
+func _update_dirs_search(search_text: String, output):
 	var empty_search = search_text.is_empty()
-	var entries = []
 	for dir in _dirs:
 		if empty_search or search_text.is_subsequence_ofn(dir.name):
-			entries.push_back({
+			output.add_search_result({
 				"score": 1.2 if search_text.to_lower() == dir.name.to_lower() else 0.0,
-				"to_tree_item": func(search_options: Tree):
-					var item = search_options.create_item(search_options.get_root())
+				"fill_tree_item": func(item: TreeItem):
 					item.set_meta("on_activate", func():
 						editor_interface.get_file_system_dock().navigate_to_path(dir.path)
 					)
@@ -180,12 +196,10 @@ func _update_dirs_search(search_text: String):
 						get_theme_icon("Folder", "EditorIcons")
 					)
 			})
-	return entries
 
 
 func _clear_tree_item_children(item):
 	for child in item.get_children():
-		item.remove_child(child)
 		child.free()
 
 
@@ -236,13 +250,11 @@ func _build_search_cache(dir: EditorFileSystemDirectory):
 				break
 
 
-func _on_popup_confirmed():
-	if not _search_options.get_selected():
-		return
-	var selected = _search_options.get_selected()
-	if selected.has_meta("on_activate"):
-		var on_activate = selected.get_meta("on_activate")
-		on_activate.call()
+func _if_null(a, b):
+	var result = a
+	if not a:
+		result = b
+	return result
 
 
 func _open_file(item):
