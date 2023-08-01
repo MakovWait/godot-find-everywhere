@@ -11,6 +11,7 @@ var _auto_select_active = false
 var _search_result_sources = {}
 
 var _files = []
+var _recent_options = []
 var _dirs = []
 var _queued_to_rebuild_cache = false
 var _icon_by_extension = {}
@@ -39,7 +40,7 @@ func _ready() -> void:
 	)
 	_search_options.item_activated.connect(_on_popup_confirmed)
 	_search_options.create_item()
-	
+
 	_line_edit.clear_button_enabled = true
 	_line_edit.focus_neighbor_bottom = _line_edit.get_path()
 	_line_edit.focus_neighbor_top = _line_edit.get_path()
@@ -101,6 +102,13 @@ func blur():
 func add_search_result(result):
 	if is_reached_max_results():
 		return
+	
+	if result.has("recent_id") and _line_edit.text.is_empty():
+		var recent_idx = _recent_options.find(result["recent_id"])
+		if recent_idx != -1:
+			var additional_score = 0.1 * (1.0 - 0.1 * (float(recent_idx) / len(_recent_options)))
+			result["score"] = result["score"] + additional_score
+	
 	var root = _search_options.get_root()
 	var idx = -1
 	for c_idx in root.get_child_count():
@@ -146,6 +154,10 @@ func _on_popup_confirmed():
 	if selected.has_meta("on_activate"):
 		var on_activate = selected.get_meta("on_activate")
 		on_activate.call()
+		if selected.get_meta("recent_id"):
+			_recent_options.push_front(selected.get_meta("recent_id"))
+			if len(_recent_options) > 10:
+				_recent_options.resize(10)
 	_parent_popup.hide()
 
 
@@ -163,11 +175,13 @@ func _update_files_search(search_text: String, output):
 			if empty_search:
 				score = 0.1
 			output.add_search_result({
+				"recent_id": file,
 				"score": score,
 				"fill_tree_item": func(item: TreeItem):
 					item.set_meta("on_activate", func():
 						_open_file(item)
 					)
+					item.set_meta("recent_id", file)
 					item.set_meta("full_path", "res://" + file)
 					item.set_text(0, file.get_file())
 					item.set_text(1, file.get_base_dir())
@@ -189,11 +203,13 @@ func _update_dirs_search(search_text: String, output):
 	for dir in _dirs:
 		if empty_search or search_text.is_subsequence_ofn(dir.name):
 			output.add_search_result({
+				"recent_id": dir.path,
 				"score": 1.2 if search_text.to_lower() == dir.name.to_lower() else 0.0,
 				"fill_tree_item": func(item: TreeItem):
 					item.set_meta("on_activate", func():
 						editor_interface.get_file_system_dock().navigate_to_path(dir.path)
 					)
+					item.set_meta("recent_id", dir.path)
 					item.set_text(0, dir.name)
 					item.set_text_alignment(1, HORIZONTAL_ALIGNMENT_RIGHT)
 					item.set_icon(
@@ -219,6 +235,7 @@ func _score_path(search, path):
 	var file = path.get_file()
 	if file.get_extension() != "gd":
 		score = score * 0.9
+	
 	var pos = file.findn(search)
 	if pos != -1:
 		return score * (1.0 - 0.1 * (float(pos) / file.length()))
@@ -248,8 +265,7 @@ func _build_search_cache(dir: EditorFileSystemDirectory):
 #		var script_type = dir.get_file_resource_script_class(i)
 #		var actual_type = script_type.is_empty() ? engine_type : script_type
 		var actual_type = engine_type
-		
-		for parent_type in ["Resource"]:
+		for parent_type in ["Resource", "TextFile"]:
 			if ClassDB.is_parent_class(engine_type, parent_type):
 				_files.push_back(file.substr(6, file.length()))
 				break

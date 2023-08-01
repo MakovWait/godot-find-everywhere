@@ -100,7 +100,8 @@ func _build_search_cache(dir: EditorFileSystemDirectory):
 #		var script_type = dir.get_file_resource_script_class(i)
 #		var actual_type = script_type.is_empty() ? engine_type : script_type
 		var actual_type = engine_type
-		
+		# TODO add support of it
+		# EDITOR_GET("docks/filesystem/textfile_extensions")
 		if file.get_extension() in ["gd", "gdshader", "tscn"]:
 			_files.push_back(file)
 
