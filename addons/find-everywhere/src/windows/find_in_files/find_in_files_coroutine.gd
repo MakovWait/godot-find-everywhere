@@ -25,6 +25,7 @@ var extension_filter = []:
 		extension_filter = value
 
 var _files = []
+var _priority_files = []
 var _current_file_idx = 0
 var _queued_to_rebuild_cache = true
 var _compiled_regex: RegEx = RegEx.new()
@@ -69,7 +70,8 @@ func start():
 		if fsp:
 			_build_search_cache(fsp)
 		_queued_to_rebuild_cache = false
-	
+
+	_sort_priority_files()
 	_found_results_number = 0
 	_current_file_idx = 0
 	set_process(true)
@@ -77,6 +79,15 @@ func start():
 
 func stop():
 	set_process(false)
+
+
+func add_priority_file(file):
+	if file:
+		_priority_files.push_front(file)
+
+
+func clear_priority_file():
+	_priority_files.clear()
 
 
 func _process(delta: float) -> void:
@@ -150,6 +161,13 @@ func _scan_line(fpath: String, line: String, line_number: int):
 
 		result_found.emit(fpath, line_number, begin, end, line)
 		return
+
+
+func _sort_priority_files():
+	for file in _priority_files:
+		if _files.has(file):
+			_files.erase(file)
+			_files.push_front(file)
 
 
 static func is_ascii_identifier_char(c: String) -> bool:

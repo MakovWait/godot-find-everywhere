@@ -248,12 +248,32 @@ func _update_search():
 		return
 	_clear_tree_item_children(_search_options.get_root())
 	_set_tip_visible(true, TIP_NOTHING_FOUND)
+	_search_coroutine.clear_priority_file()
+	_search_coroutine.add_priority_file(editor_interface.get_current_path())
+	_search_coroutine.add_priority_file(_get_edited_scene_path())
+	_search_coroutine.add_priority_file(_get_edited_script_path())
 	_search_coroutine.editor_filesystem = editor_interface.get_resource_filesystem()
 	_search_coroutine.search_text = _line_edit.text
 	_search_coroutine.max_results = 200
 	_search_coroutine.extensions_to_cache = _get_extensions_to_cache()
 	_search_coroutine.stop()
 	_search_coroutine.start()
+
+
+func _get_edited_scene_path():
+	var edited_root = editor_interface.get_edited_scene_root()
+	if edited_root:
+		return edited_root.scene_file_path
+	return null
+
+
+func _get_edited_script_path():
+	var script_editor = editor_interface.get_script_editor()
+	if script_editor:
+		var current_editor = script_editor.get_current_editor()
+		if current_editor:
+			return current_editor.get("metadata/_edit_res_path")
+	return null
 
 
 func _on_tree_item_selected():
