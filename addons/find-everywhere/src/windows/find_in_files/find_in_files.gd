@@ -44,6 +44,11 @@ func _init() -> void:
 	
 	_search_coroutine = FindInFilesCoroutine.new()
 	_search_coroutine.result_found.connect(_on_result_found)
+	_search_coroutine.finished.connect(func():
+		var root = _search_options.get_root()
+		if root and root.get_child_count() == 0:
+			_set_tip_visible(true, TIP_NOTHING_FOUND)
+	)
 	add_child(_search_coroutine)
 
 
@@ -247,7 +252,6 @@ func _update_search():
 		_set_tip_visible(true, TIP_EMPTY_SEARCH_QUERY)
 		return
 	_clear_tree_item_children(_search_options.get_root())
-	_set_tip_visible(true, TIP_NOTHING_FOUND)
 	_search_coroutine.clear_priority_file()
 	_search_coroutine.add_priority_file(editor_interface.get_current_path())
 	_search_coroutine.add_priority_file(_get_edited_scene_path())
