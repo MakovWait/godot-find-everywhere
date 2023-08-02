@@ -160,7 +160,6 @@ func _ready() -> void:
 			file.store_string(_code_edit.text)
 		_set_code_edit_editable(false)
 	)
-	_code_edit.add_theme_color_override("font_readonly_color", get_theme_color("font_color"))
 	
 	_parent_popup = get_parent()
 	_parent_popup.register_text_enter(_line_edit)
@@ -202,10 +201,8 @@ func _ready() -> void:
 
 
 func focus():
+	_update_syntax_highlighter()
 	var script_editor = _get_current_script_editor()
-	if script_editor:
-		var syntax_highlighter = script_editor.syntax_highlighter
-		_code_edit.syntax_highlighter = syntax_highlighter
 	if script_editor is TextEdit:
 		var selected_text = script_editor.get_selected_text()
 		if not selected_text.is_empty() and _line_edit.text != selected_text:
@@ -389,6 +386,19 @@ func _get_current_script_editor():
 			var editor = script_editor.get_current_editor().get_base_editor()
 			return editor
 	return null
+
+
+func _update_syntax_highlighter():
+	var script_editor = editor_interface.get_script_editor()
+	if script_editor:
+		for open_script_editor in script_editor.get_open_script_editors():
+			var base_editor = open_script_editor.get_base_editor()
+			var syntax_highlighter = base_editor.syntax_highlighter
+			if "GDScriptSyntaxHighlighter" in str(syntax_highlighter):
+				_code_edit.syntax_highlighter = syntax_highlighter
+				_code_edit.add_theme_color_override("font_readonly_color", get_theme_color("font_color"))
+				return
+	_code_edit.remove_theme_color_override("font_readonly_color")
 
 
 func _add_search_checkbox(cname, button_pressed, on_toggled):
