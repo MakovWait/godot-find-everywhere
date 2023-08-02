@@ -26,6 +26,7 @@ var editor_interface: EditorInterface
 @onready var _tip_container: Control = %TipContainer
 @onready var _tip_label: Label = _tip_container.get_node("Label")
 @onready var _search_results_container: Control = %SearchResultsContainer
+@onready var _more_extensions_menu_button: MenuButton = %MoreExtensionsMenuButton
 
 var _parent_popup: ConfirmationDialog
 var _search_coroutine: FindInFilesCoroutine
@@ -75,6 +76,23 @@ func _ready() -> void:
 	_add_search_checkbox("gd", true, add_filter.call("gd"))
 	_add_search_checkbox("tscn", false, add_filter.call("tscn"))
 	_add_search_checkbox("gdshader", true, add_filter.call("gdshader"))
+	
+	var extension_by_id = {}
+	var last_id = 0
+	var btn_popup = _more_extensions_menu_button.get_popup()
+	for extension in _get_textfile_extensions():
+		btn_popup.add_item(extension, last_id)
+		btn_popup.set_item_as_checkable(btn_popup.get_item_index(last_id), true)
+		extension_by_id[last_id] = extension
+		last_id += 1
+	
+	btn_popup.id_pressed.connect(func(id):
+		var idx = btn_popup.get_item_index(id)
+		btn_popup.toggle_item_checked(idx)
+		add_filter.call(extension_by_id[id]).call(
+			btn_popup.is_item_checked(idx)
+		)
+	)
 	
 	_update_theme()
 	theme_changed.connect(_update_theme)
@@ -236,6 +254,7 @@ func _update_search():
 	_search_coroutine.editor_filesystem = editor_interface.get_resource_filesystem()
 	_search_coroutine.search_text = _line_edit.text
 	_search_coroutine.max_results = 200
+	_search_coroutine.extensions_to_cache = _get_extensions_to_cache()
 	_search_coroutine.stop()
 	_search_coroutine.start()
 
@@ -402,3 +421,19 @@ func _goto_line_selection(text_editor: CodeEdit, p_line: int, p_begin: int, p_en
 	text_editor.call_deferred("set_caret_column", p_end)
 	text_editor.center_viewport_to_caret.bind(0).call_deferred()
 	text_editor.select(p_line, p_begin, p_line, p_end)
+
+
+func _get_extensions_to_cache():
+	var extensions_to_cache = ["gd", "gdshader", "tscn"]
+	extensions_to_cache.append_array(_get_textfile_extensions())
+	return extensions_to_cache
+
+
+func _get_textfile_extensions():
+	var value = editor_interface.get_editor_settings().get(
+		"docks/filesystem/textfile_extensions"
+	)
+	if value is String:
+		return value.split(",")
+	else:
+		return []

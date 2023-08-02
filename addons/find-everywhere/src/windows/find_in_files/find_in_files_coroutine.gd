@@ -10,6 +10,7 @@ var whole_words = false
 var regex = false
 var max_results = INF
 var editor_filesystem: EditorFileSystem
+var extensions_to_cache = []
 
 var folder = "":
 	set(value):
@@ -100,9 +101,7 @@ func _build_search_cache(dir: EditorFileSystemDirectory):
 #		var script_type = dir.get_file_resource_script_class(i)
 #		var actual_type = script_type.is_empty() ? engine_type : script_type
 		var actual_type = engine_type
-		# TODO add support of it
-		# EDITOR_GET("docks/filesystem/textfile_extensions")
-		if file.get_extension() in ["gd", "gdshader", "tscn"]:
+		if file.get_extension() in extensions_to_cache:
 			_files.push_back(file)
 
 
