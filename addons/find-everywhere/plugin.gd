@@ -13,7 +13,7 @@ var _quick_open_popup
 
 func _enter_tree() -> void:
 	_popup_trigger = DoubleClick.new(
-		KEY_SHIFT, 500, 120
+		KEY_SHIFT, 200, 120
 	)
 	_popup_trigger.triggered.connect(_show_popup)
 

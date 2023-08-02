@@ -73,8 +73,8 @@ func _ready() -> void:
 	_add_search_toggle_button(".*", false, set_property.call("regex"), "Regex")
 
 	_add_search_checkbox("gd", true, add_filter.call("gd"))
-	_add_search_checkbox("tscn", true, add_filter.call("tscn"))
-	_add_search_checkbox("gdshader", false, add_filter.call("gdshader"))
+	_add_search_checkbox("tscn", false, add_filter.call("tscn"))
+	_add_search_checkbox("gdshader", true, add_filter.call("gdshader"))
 	
 	_update_theme()
 	theme_changed.connect(_update_theme)
@@ -142,6 +142,7 @@ func _ready() -> void:
 			file.store_string(_code_edit.text)
 		_set_code_edit_editable(false)
 	)
+	_code_edit.add_theme_color_override("font_readonly_color", get_theme_color("font_color"))
 	
 	_parent_popup = get_parent()
 	_parent_popup.register_text_enter(_line_edit)
@@ -399,4 +400,5 @@ func _goto_line_selection(text_editor: CodeEdit, p_line: int, p_begin: int, p_en
 	text_editor.unfold_line(p_line)
 	text_editor.call_deferred("set_caret_line", p_line)
 	text_editor.call_deferred("set_caret_column", p_end)
+	text_editor.center_viewport_to_caret.bind(0).call_deferred()
 	text_editor.select(p_line, p_begin, p_line, p_end)
