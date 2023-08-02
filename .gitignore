@@ -19,5 +19,7 @@ addons/quick_script_change
 addons/QuickPluginManager
 addons/zylann.editor_debugger
 addons/script-name-on-top
+addons/godot-last-tabs-switcher
+addons/godot-script-tabs
 
 trash/
