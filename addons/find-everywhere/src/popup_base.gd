@@ -5,6 +5,7 @@ var _prev_rect
 
 
 func _ready() -> void:
+	focus_exited.connect(self.hide)
 	visibility_changed.connect(func():
 		if not visible:
 			_prev_rect = Rect2i(position, size)

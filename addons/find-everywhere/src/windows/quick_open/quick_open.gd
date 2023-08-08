@@ -35,6 +35,11 @@ func _ready() -> void:
 	_search_options.add_theme_constant_override("draw_guides", 1)
 	_search_options.columns = 2
 	_search_options.select_mode = Tree.SELECT_ROW
+	_search_options.set_column_expand(0, true)
+	_search_options.set_column_expand(1, true)
+	_search_options.set_column_clip_content(0, true)
+	_search_options.set_column_clip_content(1, true)
+	_search_options.scroll_horizontal_enabled = false
 	_search_options.gui_input.connect(func(event):
 		_line_edit.grab_focus()
 	)
@@ -190,6 +195,9 @@ func _update_files_search(search_text: String, output):
 					item.set_meta("full_path", "res://" + file)
 					item.set_text(0, file.get_file())
 					item.set_text(1, file.get_base_dir())
+					item.set_text_direction(1, Control.TEXT_DIRECTION_RTL)
+					item.set_tooltip_text(1, file)
+					item.set_tooltip_text(0, file)
 		#			item.set_text(1, str(entries[i].score))
 					item.set_custom_color(1, _search_options.get_theme_color("font_color") * Color(1, 1, 1, 0.5))
 					item.set_text_alignment(1, HORIZONTAL_ALIGNMENT_RIGHT)
