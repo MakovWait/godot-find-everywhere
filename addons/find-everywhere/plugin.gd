@@ -83,7 +83,10 @@ func _init_settings():
 		var ev = InputEventKey.new()
 		ev.device = -1
 		ev.shift_pressed = true
-		ev.ctrl_pressed = true
+		if OS.has_feature("macos"):
+			ev.ctrl_pressed = true
+		else:
+			ev.alt_pressed = true
 		ev.keycode = 70
 		sh.events = [ev]
 		editor_settings.set_setting(FIND_IN_FILES_SH_SETTING_NAME, sh)
