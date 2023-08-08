@@ -61,9 +61,7 @@ func _ready() -> void:
 		_update_search()
 	)
 	
-	editor_interface.get_resource_filesystem().filesystem_changed.connect(func():
-		_queued_to_rebuild_cache = true
-	)
+	editor_interface.get_resource_filesystem().filesystem_changed.connect(_on_filesystem_changed)
 	
 	visibility_changed.connect(func():
 		if is_visible_in_tree():
@@ -79,6 +77,13 @@ func _ready() -> void:
 	
 	_rebuild_search_cache()
 	_update_search()
+
+
+func _exit_tree() -> void:
+	if editor_interface:
+		var fs = editor_interface.get_resource_filesystem()
+		if fs.filesystem_changed.is_connected(_on_filesystem_changed):
+			fs.filesystem_changed.disconnect(_on_filesystem_changed)
 
 
 func _add_search_results_source(src_name, src):
@@ -269,6 +274,10 @@ func _build_search_cache(dir: EditorFileSystemDirectory):
 			if ClassDB.is_parent_class(engine_type, parent_type):
 				_files.push_back(file.substr(6, file.length()))
 				break
+
+
+func _on_filesystem_changed():
+	_queued_to_rebuild_cache = true
 
 
 func _if_null(a, b):

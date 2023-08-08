@@ -1,3 +1,5 @@
+extends RefCounted
+
 signal triggered
 
 var _trigger_key: Key

@@ -43,6 +43,12 @@ func _on_filesystem_changed():
 	_queued_to_rebuild_cache = true
 
 
+func _exit_tree() -> void:
+	if editor_filesystem: 
+		if editor_filesystem.filesystem_changed.is_connected(_on_filesystem_changed):
+			editor_filesystem.filesystem_changed.disconnect(_on_filesystem_changed)
+
+
 func start():
 	if not editor_filesystem.filesystem_changed.is_connected(_on_filesystem_changed):
 		editor_filesystem.filesystem_changed.connect(_on_filesystem_changed)
