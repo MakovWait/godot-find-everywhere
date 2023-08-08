@@ -66,11 +66,20 @@ unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="Label" type="Label" parent="TipContainer"]
+[node name="VBoxContainer" type="VBoxContainer" parent="TipContainer"]
+layout_mode = 2
+alignment = 1
+
+[node name="TipLabel" type="Label" parent="TipContainer/VBoxContainer"]
+unique_name_in_owner = true
 layout_mode = 2
 text = "Type search query to find in files"
 horizontal_alignment = 1
 vertical_alignment = 1
+
+[node name="ProgressLabel" type="Label" parent="TipContainer/VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
 
 [node name="SearchResultsContainer" type="VSplitContainer" parent="."]
 unique_name_in_owner = true

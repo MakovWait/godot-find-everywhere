@@ -24,9 +24,10 @@ var editor_interface: EditorInterface
 @onready var _folder_line_edit: LineEdit = %FolderLineEdit
 @onready var _code_edit_editable_check: CheckBox = %CodeEditEditableCheckBox
 @onready var _tip_container: Control = %TipContainer
-@onready var _tip_label: Label = _tip_container.get_node("Label")
+@onready var _tip_label: Label = %TipLabel
 @onready var _search_results_container: Control = %SearchResultsContainer
 @onready var _more_extensions_menu_button: MenuButton = %MoreExtensionsMenuButton
+@onready var _progress_label: Label = %ProgressLabel
 
 var _parent_popup: ConfirmationDialog
 var _search_coroutine: FindInFilesCoroutine
@@ -204,6 +205,14 @@ func _ready() -> void:
 		_line_edit.text = _search_history_button.get_popup().get_item_text(idx)
 		_update_search()
 	)
+	
+	_progress_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_search_coroutine.progress.connect(func(cur, all):
+		if not _progress_label.visible:
+			_progress_label.show()
+		_progress_label.text = "Searching... %s/%s" % [cur, all]
+	)
+	_search_coroutine.finished.connect(_progress_label.hide)
 
 
 func _exit_tree() -> void:

@@ -1,6 +1,7 @@
 #https://github.com/godotengine/godot/blob/f6187014ec1d7a47b7201f64f3a8376a5da2f42d/editor/find_in_files.cpp
 extends Node
 
+signal progress(current, all)
 signal result_found(fpath, line_number, begin, end, line)
 signal finished
 
@@ -84,6 +85,7 @@ func start():
 
 
 func stop():
+	finished.emit()
 	set_process(false)
 
 
@@ -101,11 +103,13 @@ func _process(delta: float) -> void:
 	while _current_file_idx < len(_files) and is_processing():
 		_scan_file(_files[_current_file_idx])
 		_current_file_idx += 1
+		if is_processing():
+			progress.emit(_current_file_idx, len(_files))
 		var elapsed = Time.get_ticks_usec() - time_before
 		if elapsed > 8:
 			return
-	set_process(false)
 	finished.emit()
+	set_process(false)
 
 
 func _build_search_cache(dir: EditorFileSystemDirectory):
