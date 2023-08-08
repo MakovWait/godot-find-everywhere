@@ -13,6 +13,7 @@ var _quick_open_popup
 
 
 func _enter_tree() -> void:
+	_load_name()
 	_init_settings()
 	_load_settings()
 	get_editor_interface().get_editor_settings().settings_changed.connect(_load_settings)
@@ -39,6 +40,21 @@ func _exit_tree() -> void:
 	_popup_trigger.triggered.disconnect(_show_popup)
 	_quick_open_popup.queue_free()
 	_find_in_files_popup.queue_free()
+
+
+## [param src] should be a [Callable] or [Object] (see ["addons/find-everywhere/src/windows/quick_open/search_results_source_base.gd"])[br]
+## [code]Note[/code]: if [param src] is [Node], it will be added to ["addons/find-everywhere/src/windows/quick_open/quick_open.gd"] as a child. 
+func quick_open_add_source(src_name: String, src):
+	_quick_open_popup.unwrap().add_search_results_source(src_name, src)
+
+
+func quick_open_remove_source(src_name):
+	_quick_open_popup.unwrap().remove_search_results_source(src_name)
+
+
+## the next time ["addons/find-everywhere/src/windows/quick_open/quick_open.gd"] is raised, search results will be updated [br]
+func quick_open_request_update_search():
+	_quick_open_popup.unwrap().request_update_search()
 
 
 func _shortcut_input(event: InputEvent) -> void:
@@ -75,3 +91,11 @@ func _init_settings():
 		"name": FIND_IN_FILES_SH_SETTING_NAME,
 		"type": TYPE_OBJECT,
 	})
+
+
+func _load_name():
+	var cfg = ConfigFile.new()
+	cfg.load("res://addons/find-everywhere/plugin.cfg")
+	var cfg_name = cfg.get_value("plugin", "name")
+	if cfg_name:
+		name = cfg_name

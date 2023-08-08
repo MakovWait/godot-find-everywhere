@@ -8,5 +8,5 @@ static func get_find_in_files(editor_interface: EditorInterface):
 	)
 	scene.editor_interface = editor_interface
 	var popup = PopupBase.new()
-	popup.add_child(scene)
+	popup.set_origin(scene)
 	return popup

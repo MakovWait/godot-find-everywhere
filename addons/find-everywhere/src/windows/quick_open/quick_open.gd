@@ -1,6 +1,8 @@
 @tool
 extends VBoxContainer
 
+const Output = preload("res://addons/find-everywhere/src/windows/quick_open/output.gd")
+
 var editor_interface: EditorInterface
 var search_sources_to_add = []
 
@@ -14,6 +16,7 @@ var _files = []
 var _recent_options = []
 var _dirs = []
 var _queued_to_rebuild_cache = false
+var _queued_to_update_search = false
 var _icon_by_extension = {}
 var _default_icon
 var _parent_popup: ConfirmationDialog
@@ -42,6 +45,11 @@ func _ready() -> void:
 	_search_options.scroll_horizontal_enabled = false
 	_search_options.gui_input.connect(func(event):
 		_line_edit.grab_focus()
+	)
+	_search_options.item_selected.connect(func():
+		var selected = _search_options.get_selected()
+		if selected and selected.has_meta("on_select"):
+			selected.get_meta("on_select").call()
 	)
 	_search_options.item_activated.connect(_on_popup_confirmed)
 	_search_options.create_item()
@@ -75,10 +83,10 @@ func _ready() -> void:
 			blur()
 	)
 	
-	_add_search_results_source("files", _update_files_search)
-	_add_search_results_source("dirs", _update_dirs_search)
+	add_search_results_source("files", _update_files_search)
+	add_search_results_source("dirs", _update_dirs_search)
 	for src in search_sources_to_add:
-		_add_search_results_source(src.name, src.handler)
+		add_search_results_source(src.name, src.handler)
 	
 	_rebuild_search_cache()
 	_update_search()
@@ -91,10 +99,22 @@ func _exit_tree() -> void:
 			fs.filesystem_changed.disconnect(_on_filesystem_changed)
 
 
-func _add_search_results_source(src_name, src):
+func add_search_results_source(src_name, src):
 	_search_result_sources[src_name] = src
 	if src is Node:
-		src.add_child(src)
+		self.add_child(src)
+	_queued_to_update_search = true
+
+
+func remove_search_results_source(src_name):
+	if not src_name in _search_result_sources:
+		push_warning("%s source was not found" % src_name)
+		return
+	var src = _search_result_sources[src_name]
+	_search_result_sources.erase(src_name)
+	if src is Node:
+		self.remove_child(src)
+	_queued_to_update_search = true
 
 
 func focus():
@@ -103,10 +123,17 @@ func focus():
 	if _queued_to_rebuild_cache:
 		_rebuild_search_cache()
 		_update_search()
+	elif _queued_to_update_search:
+		_update_search()
+	_queued_to_update_search = false
 
 
 func blur():
 	pass
+
+
+func request_update_search():
+	_queued_to_update_search = true
 
 
 func add_search_result(result):
@@ -147,11 +174,12 @@ func _update_search():
 	_clear_tree_item_children(_search_options.get_root())
 	
 	var search_text = _line_edit.text
+	var output = Output.new(self)
 	for src in _search_result_sources.values():
 		if src is Callable:
-			src.call(search_text, self)
+			src.call(search_text, output)
 		else:
-			src.update_search(search_text, self)
+			src.update_search(search_text, output)
 
 
 func _on_popup_confirmed():

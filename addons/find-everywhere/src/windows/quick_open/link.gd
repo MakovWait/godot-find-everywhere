@@ -12,5 +12,5 @@ static func get_quick_open(
 	scene.editor_interface = editor_interface
 	scene.search_sources_to_add = search_sources_to_add
 	var popup = PopupBase.new()
-	popup.add_child(scene)
+	popup.set_origin(scene)
 	return popup

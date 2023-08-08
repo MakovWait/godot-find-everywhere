@@ -2,6 +2,7 @@ extends ConfirmationDialog
 
 
 var _prev_rect
+var _origin
 
 
 func _ready() -> void:
@@ -17,3 +18,12 @@ func raise(edscale):
 		popup(_prev_rect)
 	else:
 		popup_centered_clamped(Vector2(600, 800) * edscale, 0.8)
+
+
+func set_origin(o):
+	_origin = o
+	add_child(o)
+
+
+func unwrap():
+	return _origin
