@@ -1,13 +1,10 @@
 # godot-find-everywhere
 
-<p align="center">Better Find in Files and Quick Open.</p>
-
 <p align="center">
   <img src="https://github.com/MakovWait/godot-find-everywhere/blob/main/assets/find-in-files.png" width="40%"/>
   <img src="https://github.com/MakovWait/godot-find-everywhere/blob/main/assets/quick-open.png" width="40%"/>
 </p>
-
-<p align="center">Porting <a href="https://github.com/aronwoost/sublime-expand-region">sublime-expand-region</a> to godot4 with some tweaks.</p>
+<p align="center">Better Find in Files and Quick Open.</p>
 
 Default shortcuts
 --
