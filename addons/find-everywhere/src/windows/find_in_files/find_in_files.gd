@@ -32,6 +32,7 @@ var _parent_popup: ConfirmationDialog
 var _search_coroutine: FindInFilesCoroutine
 var _line_edit_debounce: Timer
 var _last_search_history = []
+var _reset_highlighter
 
 
 func _init() -> void:
@@ -205,6 +206,10 @@ func _ready() -> void:
 	)
 
 
+func _exit_tree() -> void:
+	_cleanup_syntax_highlighter()
+
+
 func focus():
 	_update_syntax_highlighter()
 	var script_editor = _get_current_script_editor()
@@ -226,6 +231,14 @@ func blur():
 	_search_coroutine.stop()
 	_line_edit_debounce.stop()
 	_last_search_history.append(_line_edit.text)
+	_code_edit.remove_theme_color_override("font_readonly_color")
+	_cleanup_syntax_highlighter()
+
+
+func _cleanup_syntax_highlighter():
+	if _reset_highlighter:
+		_reset_highlighter.call_deferred()
+		_reset_highlighter = null
 
 
 func _set_code_edit_editable(value):
@@ -419,10 +432,14 @@ func _update_syntax_highlighter():
 			var base_editor = open_script_editor.get_base_editor()
 			var syntax_highlighter = base_editor.syntax_highlighter
 			if "GDScriptSyntaxHighlighter" in str(syntax_highlighter):
+				_reset_highlighter = func():
+					_code_edit.syntax_highlighter = null
+					if is_instance_valid(base_editor):
+						base_editor.syntax_highlighter = SyntaxHighlighter.new()
+						base_editor.syntax_highlighter = syntax_highlighter
 				_code_edit.syntax_highlighter = syntax_highlighter
 				_code_edit.add_theme_color_override("font_readonly_color", get_theme_color("font_color"))
 				return
-	_code_edit.remove_theme_color_override("font_readonly_color")
 
 
 func _add_search_checkbox(cname, button_pressed, on_toggled):
