@@ -2,6 +2,8 @@
 extends EditorPlugin
 
 const FIND_IN_FILES_SH_SETTING_NAME = "addons/FindEverywhere/find_in_files_shortcut"
+const QUICK_OPEN_DETECT_INPUT_MS = "addons/FindEverywhere/quick_open_detect_input_ms"
+const QUICK_OPEN_IGNORE_INPUT_MS = "addons/FindEverywhere/quick_open_ignore_input_ms"
 
 const DoubleClick = preload("res://addons/find-everywhere/src/triggers/double_click.gd")
 
@@ -17,11 +19,6 @@ func _enter_tree() -> void:
 	_init_settings()
 	_load_settings()
 	get_editor_interface().get_editor_settings().settings_changed.connect(_load_settings)
-	
-	_popup_trigger = DoubleClick.new(
-		KEY_SHIFT, 200, 120
-	)
-	_popup_trigger.triggered.connect(_show_popup)
 
 	_find_in_files_popup = preload(
 		"res://addons/find-everywhere/src/windows/find_in_files/link.gd"
@@ -74,9 +71,18 @@ func _show_popup():
 func _load_settings():
 	var editor_settings = get_editor_interface().get_editor_settings()
 	_sh = editor_settings.get_setting(FIND_IN_FILES_SH_SETTING_NAME)
+	
+	_popup_trigger = DoubleClick.new(
+		KEY_SHIFT, 
+		editor_settings.get_setting(QUICK_OPEN_DETECT_INPUT_MS), 
+		editor_settings.get_setting(QUICK_OPEN_IGNORE_INPUT_MS)
+	)
+	_popup_trigger.triggered.connect(_show_popup)
 
 
 func _init_settings():
+	_init_ms_setting(QUICK_OPEN_DETECT_INPUT_MS, 200)
+	_init_ms_setting(QUICK_OPEN_IGNORE_INPUT_MS, 120)
 	var editor_settings = get_editor_interface().get_editor_settings()
 	if not editor_settings.has_setting(FIND_IN_FILES_SH_SETTING_NAME):
 		var sh = Shortcut.new()
@@ -93,6 +99,16 @@ func _init_settings():
 	editor_settings.add_property_info({
 		"name": FIND_IN_FILES_SH_SETTING_NAME,
 		"type": TYPE_OBJECT,
+	})
+
+
+func _init_ms_setting(setting_name, default_value):
+	var editor_settings = get_editor_interface().get_editor_settings()
+	if not editor_settings.has_setting(setting_name):
+		editor_settings.set_setting(setting_name, default_value)
+	editor_settings.add_property_info({
+		"name": setting_name,
+		"type": TYPE_INT,
 	})
 
 
