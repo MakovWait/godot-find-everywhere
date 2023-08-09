@@ -2,6 +2,7 @@
 extends VBoxContainer
 
 const Output = preload("res://addons/find-everywhere/src/windows/quick_open/output.gd")
+const LINE_EDIT_DEBOUNCE_TIME_MSEC = 300
 
 var editor_interface: EditorInterface
 var search_sources_to_add = []
@@ -20,6 +21,16 @@ var _queued_to_update_search = false
 var _icon_by_extension = {}
 var _default_icon
 var _parent_popup: ConfirmationDialog
+var _line_edit_debounce: Timer
+
+
+func _init() -> void:
+	_line_edit_debounce = Timer.new()
+	_line_edit_debounce.one_shot = true
+	_line_edit_debounce.timeout.connect(func():
+		_update_search()
+	)
+	add_child(_line_edit_debounce)
 
 
 func _ready() -> void:
@@ -71,7 +82,9 @@ func _ready() -> void:
 					Input.parse_input_event(e)
 	)
 	_line_edit.text_changed.connect(func(_new_text):
-		_update_search()
+		_line_edit_debounce.start(
+			LINE_EDIT_DEBOUNCE_TIME_MSEC / 1000.0
+		)
 	)
 	
 	editor_interface.get_resource_filesystem().filesystem_changed.connect(_on_filesystem_changed)
@@ -129,7 +142,7 @@ func focus():
 
 
 func blur():
-	pass
+	_line_edit_debounce.stop()
 
 
 func request_update_search():
