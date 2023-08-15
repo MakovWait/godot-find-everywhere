@@ -16,7 +16,7 @@ config/icon="res://icon.svg"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/QuickPluginManager/plugin.cfg", "res://addons/godot-last-tabs-switcher/plugin.cfg", "res://addons/godot-script-tabs/plugin.cfg", "res://addons/expand-region/plugin.cfg", "res://addons/zylann.editor_debugger/plugin.cfg", "res://addons/quick-open-src-example/plugin.cfg", "res://addons/find-everywhere/plugin.cfg")
+enabled=PackedStringArray("res://addons/QuickPluginManager/plugin.cfg", "res://addons/godot-last-tabs-switcher/plugin.cfg", "res://addons/godot-script-tabs/plugin.cfg", "res://addons/expand-region/plugin.cfg", "res://addons/zylann.editor_debugger/plugin.cfg", "res://addons/find-everywhere/plugin.cfg")
 
 [rendering]
 
