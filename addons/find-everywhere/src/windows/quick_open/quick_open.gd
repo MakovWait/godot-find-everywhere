@@ -15,7 +15,7 @@ var _search_result_sources = {}
 
 var _files = []
 var _recent_options = []
-var _dirs = []
+var _search_results = []
 var _queued_to_rebuild_cache = false
 var _queued_to_update_search = false
 var _icon_by_extension = {}
@@ -97,7 +97,6 @@ func _ready() -> void:
 	)
 	
 	add_search_results_source("files", _update_files_search)
-	add_search_results_source("dirs", _update_dirs_search)
 	for src in search_sources_to_add:
 		add_search_results_source(src.name, src.handler)
 	
@@ -150,32 +149,7 @@ func request_update_search():
 
 
 func add_search_result(result):
-	if is_reached_max_results():
-		return
-	
-	if result.has("recent_id") and _line_edit.text.is_empty():
-		var recent_idx = _recent_options.find(result["recent_id"])
-		if recent_idx != -1:
-			var additional_score = 0.1 * (1.0 - 0.1 * (float(recent_idx) / len(_recent_options)))
-			result["score"] = result["score"] + additional_score
-	
-	var root = _search_options.get_root()
-	var idx = -1
-	for c_idx in root.get_child_count():
-		var c = root.get_child(c_idx)
-		if result["score"] > c.get_meta("score"):
-			idx = c_idx
-			break
-	var item: TreeItem = root.create_child(idx)
-	result["fill_tree_item"].call(item)
-	item.set_meta("score", result["score"])
-	
-	if _auto_select_active:
-		var to_select = _search_options.get_root().get_first_child()
-		if not to_select:
-			return
-		to_select.select(0)
-		_search_options.scroll_to_item(to_select)
+	_search_results.push_back(result)
 
 
 func is_reached_max_results():
@@ -185,6 +159,7 @@ func is_reached_max_results():
 func _update_search():
 	_auto_select_active = true
 	_clear_tree_item_children(_search_options.get_root())
+	_search_results.clear()
 	
 	var search_text = _line_edit.text
 	var output = Output.new(self)
@@ -193,6 +168,39 @@ func _update_search():
 			src.call(search_text, output)
 		else:
 			src.update_search(search_text, output)
+	_build_tree()
+
+
+func _build_tree():
+	_search_results.sort_custom(func(a,b): return a.score > b.score)
+	
+	for result in _search_results:
+		if is_reached_max_results():
+			return
+		
+		if result.has("recent_id") and _line_edit.text.is_empty():
+			var recent_idx = _recent_options.find(result["recent_id"])
+			if recent_idx != -1:
+				var additional_score = 0.1 * (1.0 - 0.1 * (float(recent_idx) / len(_recent_options)))
+				result["score"] = result["score"] + additional_score
+		
+		var root = _search_options.get_root()
+		var idx = -1
+		for c_idx in root.get_child_count():
+			var c = root.get_child(c_idx)
+			if result["score"] > c.get_meta("score"):
+				idx = c_idx
+				break
+		var item: TreeItem = root.create_child(idx)
+		result["fill_tree_item"].call(item)
+		item.set_meta("score", result["score"])
+		
+		if _auto_select_active:
+			var to_select = _search_options.get_root().get_first_child()
+			if not to_select:
+				return
+			to_select.select(0)
+			_search_options.scroll_to_item(to_select)
 
 
 func _on_popup_confirmed():
@@ -252,27 +260,6 @@ func _update_files_search(search_text: String, output):
 			})
 
 
-func _update_dirs_search(search_text: String, output):
-	var empty_search = search_text.is_empty()
-	for dir in _dirs:
-		if empty_search or search_text.is_subsequence_ofn(dir.name):
-			output.add_search_result({
-				"recent_id": dir.path,
-				"score": 1.2 if search_text.to_lower() == dir.name.to_lower() else 0.0,
-				"fill_tree_item": func(item: TreeItem):
-					item.set_meta("on_activate", func():
-						editor_interface.get_file_system_dock().navigate_to_path(dir.path)
-					)
-					item.set_meta("recent_id", dir.path)
-					item.set_text(0, dir.name)
-					item.set_text_alignment(1, HORIZONTAL_ALIGNMENT_RIGHT)
-					item.set_icon(
-						0, 
-						get_theme_icon("Folder", "EditorIcons")
-					)
-			})
-
-
 func _clear_tree_item_children(item):
 	for child in item.get_children():
 		child.free()
@@ -300,16 +287,11 @@ func _score_path(search, path):
 
 func _rebuild_search_cache():
 	_files.clear()
-	_dirs.clear()
 	_build_search_cache(editor_interface.get_resource_filesystem().get_filesystem())
 	_queued_to_rebuild_cache = false
 
 
 func _build_search_cache(dir: EditorFileSystemDirectory):
-	_dirs.push_back({
-		'path': dir.get_path(),
-		'name': "res://" if dir.get_name().is_empty() else dir.get_name(),
-	})
 	for i in dir.get_subdir_count():
 		_build_search_cache(dir.get_subdir(i))
 	
