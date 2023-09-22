@@ -6,6 +6,10 @@
 </p>
 <p align="center">Better Find in Files and Quick Open.</p>
 
+<p align="center">
+  <img src="https://github.com/MakovWait/godot-find-everywhere/blob/main/assets/usage.png"/>
+</p>
+
 Default shortcuts
 --
 <kbd>SHIFT-SHIFT</kbd> - Quick Open
