@@ -28,6 +28,8 @@ var editor_interface: EditorInterface
 @onready var _search_results_container: Control = %SearchResultsContainer
 @onready var _more_extensions_menu_button: MenuButton = %MoreExtensionsMenuButton
 @onready var _progress_label: Label = %ProgressLabel
+@onready var _reload_btn: Button = Button.new()
+
 
 var _parent_popup: ConfirmationDialog
 var _search_coroutine: FindInFilesCoroutine
@@ -75,6 +77,14 @@ func _ready() -> void:
 		return func(toggled):
 			self._search_coroutine.set(prop_name, toggled)
 			_update_search()
+	
+	_reload_btn.pressed.connect(func():
+		_update_search()
+		_line_edit.grab_focus()
+	)
+	_reload_btn.flat = true
+	_reload_btn.tooltip_text = tr("Refresh")
+	_line_edit_options.add_child(_reload_btn)
 	
 	_add_search_toggle_button("W", false, set_property.call("whole_words"), "Words")
 	_add_search_toggle_button("Cc", false, set_property.call("match_case"), "Match case")
@@ -403,6 +413,7 @@ func _open_selected_item():
 
 
 func _update_theme():
+	_reload_btn.icon = get_theme_icon("Reload", "EditorIcons")
 #	_line_edit.right_icon = get_theme_icon("Search", "EditorIcons")
 	_search_history_button.icon = get_theme_icon("Search", "EditorIcons")
 	_line_edit.right_icon = null
