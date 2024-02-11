@@ -21,7 +21,7 @@ Shortcuts can be configured via <code>Editor Settings/Addons/Find Everywhere</co
 Exclude folders from SearchEverywhere
 --
 Folders to exclude are able to be configured via <code>Editor Settings/Addons/Find Everywhere</code>
-List folders you want to ignore joined with ',' i.e. `res://addons,res://trash`. Also the _full_ path to folder is expected (started with `res://`).  
+List folders you want to ignore joined with `,` i.e. `res://addons,res://trash`. Also the _full_ path to folder is expected (started with `res://`).  
 
 QuickOpen Extensions
 -----------------
