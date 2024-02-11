@@ -18,6 +18,11 @@ Default shortcuts
 
 Shortcuts can be configured via <code>Editor Settings/Addons/Find Everywhere</code>
 
+Exclude folders from SearchEverywhere
+--
+Folders to exclude are able to be configured via <code>Editor Settings/Addons/Find Everywhere</code>
+List folders you want to ignore joined with ',' i.e. `res://addons,res://trash`. Also the _full_ path to folder is expected (started with `res://`).  
+
 QuickOpen Extensions
 -----------------
 QuickOpen can be extended with custom <code>plugins</code>. See <a href="https://github.com/MakovWait/godot-find-everywhere/blob/main/quick_open_extension_example.gd">example</a>.
