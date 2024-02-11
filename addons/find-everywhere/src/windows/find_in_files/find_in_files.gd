@@ -4,12 +4,21 @@ extends VBoxContainer
 const TIP_EMPTY_SEARCH_QUERY = "Type search query to find in files."
 const TIP_NOTHING_FOUND = "Nothing found."
 
+# {name: default_checked}
+const DEFAULT_SEARCH_EXTENSIONS = {
+	"gd": true,
+	"tscn": false,
+	"gdshader": true,
+	"tres": false
+}
+
 const LINE_EDIT_DEBOUNCE_TIME_MSEC = 300
 const FindInFilesCoroutine = preload(
 	"res://addons/find-everywhere/src/windows/find_in_files/find_in_files_coroutine.gd"
 )
 
 var editor_interface: EditorInterface
+var folders_to_ignore_setting_name: String
 
 @onready var _search_options: Tree = %SearchOptions
 @onready var _code_edit: CodeEdit = %CodeEdit
@@ -79,6 +88,7 @@ func _ready() -> void:
 			_update_search()
 	
 	_reload_btn.pressed.connect(func():
+		_search_coroutine.queue_to_rebuild_cache()
 		_update_search()
 		_line_edit.grab_focus()
 	)
@@ -89,10 +99,10 @@ func _ready() -> void:
 	_add_search_toggle_button("W", false, set_property.call("whole_words"), "Words")
 	_add_search_toggle_button("Cc", false, set_property.call("match_case"), "Match case")
 	_add_search_toggle_button(".*", false, set_property.call("regex"), "Regex")
-
-	_add_search_checkbox("gd", true, add_filter.call("gd"))
-	_add_search_checkbox("tscn", false, add_filter.call("tscn"))
-	_add_search_checkbox("gdshader", true, add_filter.call("gdshader"))
+	
+	for extension in DEFAULT_SEARCH_EXTENSIONS:
+		var is_checked = DEFAULT_SEARCH_EXTENSIONS[extension]
+		_add_search_checkbox(extension, is_checked, add_filter.call(extension))
 	
 	var extension_by_id = {}
 	var last_id = 0
@@ -208,7 +218,11 @@ func _ready() -> void:
 	)
 	
 	_folder_button.pressed.connect(func():
+		_parent_popup.block_auto_hide = true
 		_file_dialog.popup_centered_clamped(Vector2i(700, 500), 0.8)
+	)
+	_file_dialog.visibility_changed.connect(func():
+		_parent_popup.block_auto_hide = _file_dialog.visible
 	)
 	
 	_search_history_button.get_popup().index_pressed.connect(func(idx):
@@ -292,6 +306,7 @@ func _update_search():
 	_search_coroutine.search_text = _line_edit.text
 	_search_coroutine.max_results = 200
 	_search_coroutine.extensions_to_cache = _get_extensions_to_cache()
+	_search_coroutine.folders_to_ignore = _get_folders_to_ignore()
 	_search_coroutine.stop()
 	_search_coroutine.start()
 
@@ -495,9 +510,19 @@ func _goto_line_selection(text_editor: CodeEdit, p_line: int, p_begin: int, p_en
 
 
 func _get_extensions_to_cache():
-	var extensions_to_cache = ["gd", "gdshader", "tscn"]
+	var extensions_to_cache = DEFAULT_SEARCH_EXTENSIONS.keys()
 	extensions_to_cache.append_array(_get_textfile_extensions())
 	return extensions_to_cache
+
+
+func _get_folders_to_ignore():
+	var setting = editor_interface.get_editor_settings().get_setting(
+		folders_to_ignore_setting_name
+	)
+	var result = []
+	if setting is String:
+		result.append_array(setting.split(","))
+	return result
 
 
 func _get_textfile_extensions():

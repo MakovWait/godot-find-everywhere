@@ -2,6 +2,8 @@
 extends EditorPlugin
 
 const FIND_IN_FILES_SH_SETTING_NAME = "addons/FindEverywhere/find_in_files_shortcut"
+const FIND_IN_FILES_FOLDERS_TO_IGNORE_SETTING = "addons/FindEverywhere/folders_to_ignore"
+
 const QUICK_OPEN_DETECT_INPUT_MS = "addons/FindEverywhere/quick_open_detect_input_ms"
 const QUICK_OPEN_IGNORE_INPUT_MS = "addons/FindEverywhere/quick_open_ignore_input_ms"
 
@@ -22,7 +24,7 @@ func _enter_tree() -> void:
 
 	_find_in_files_popup = preload(
 		"res://addons/find-everywhere/src/windows/find_in_files/link.gd"
-	).get_find_in_files(get_editor_interface())
+	).get_find_in_files(get_editor_interface(), FIND_IN_FILES_FOLDERS_TO_IGNORE_SETTING)
 	
 	_quick_open_popup = preload(
 		"res://addons/find-everywhere/src/windows/quick_open/link.gd"
@@ -83,8 +85,25 @@ func _load_settings():
 func _init_settings():
 	_init_ms_setting(QUICK_OPEN_DETECT_INPUT_MS, 200)
 	_init_ms_setting(QUICK_OPEN_IGNORE_INPUT_MS, 120)
+	_init_fif_sh_setting()
+	_init_fif_folders_to_ignore_setting()
+
+
+func _init_fif_folders_to_ignore_setting():
+	var setting_name = FIND_IN_FILES_FOLDERS_TO_IGNORE_SETTING
 	var editor_settings = get_editor_interface().get_editor_settings()
-	if not editor_settings.has_setting(FIND_IN_FILES_SH_SETTING_NAME):
+	if not editor_settings.has_setting(setting_name):
+		editor_settings.set_setting(setting_name, "")
+	editor_settings.add_property_info({
+		"name": setting_name,
+		"type": TYPE_STRING,
+	})
+
+
+func _init_fif_sh_setting():
+	var setting_name = FIND_IN_FILES_SH_SETTING_NAME
+	var editor_settings = get_editor_interface().get_editor_settings()
+	if not editor_settings.has_setting(setting_name):
 		var sh = Shortcut.new()
 		var ev = InputEventKey.new()
 		ev.device = -1
@@ -95,9 +114,9 @@ func _init_settings():
 			ev.alt_pressed = true
 		ev.keycode = 70
 		sh.events = [ev]
-		editor_settings.set_setting(FIND_IN_FILES_SH_SETTING_NAME, sh)
+		editor_settings.set_setting(setting_name, sh)
 	editor_settings.add_property_info({
-		"name": FIND_IN_FILES_SH_SETTING_NAME,
+		"name": setting_name,
 		"type": TYPE_OBJECT,
 	})
 

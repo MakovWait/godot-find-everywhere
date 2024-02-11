@@ -5,8 +5,14 @@ var _prev_rect
 var _origin
 
 
+var block_auto_hide = false
+
+
 func _ready() -> void:
-	focus_exited.connect(self.hide)
+	focus_exited.connect(func():
+		if not block_auto_hide:
+			self.hide()
+	)
 	visibility_changed.connect(func():
 		if not visible:
 			_prev_rect = Rect2i(position, size)

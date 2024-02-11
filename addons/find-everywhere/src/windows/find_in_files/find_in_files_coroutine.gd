@@ -12,6 +12,12 @@ var regex = false
 var max_results = INF
 var editor_filesystem: EditorFileSystem
 var extensions_to_cache = []
+var folders_to_ignore = []:
+	set(value):
+		var simplified = []
+		for f in value:
+			simplified.append(f.simplify_path())
+		folders_to_ignore = simplified
 
 var folder = "":
 	set(value):
@@ -75,7 +81,12 @@ func start():
 		_files.clear()
 		var fsp = editor_filesystem.get_filesystem_path(folder)
 		if fsp:
-			_build_search_cache(fsp)
+			# do not include the ignore logic if folder is specified by user
+			var ignore = _ignore_none
+			if folder.is_empty() or folder == "res://":
+				ignore = func(dir: EditorFileSystemDirectory):
+					return dir.get_path().simplify_path() in folders_to_ignore
+			_build_search_cache(fsp, ignore)
 		_queued_to_rebuild_cache = false
 
 	_sort_priority_files()
@@ -87,6 +98,10 @@ func start():
 func stop():
 	finished.emit()
 	set_process(false)
+
+
+func queue_to_rebuild_cache():
+	_queued_to_rebuild_cache = true
 
 
 func add_priority_file(file):
@@ -112,9 +127,10 @@ func _process(delta: float) -> void:
 	set_process(false)
 
 
-func _build_search_cache(dir: EditorFileSystemDirectory):
+func _build_search_cache(dir: EditorFileSystemDirectory, ignore: Callable):
+	if ignore.call(dir): return
 	for i in dir.get_subdir_count():
-		_build_search_cache(dir.get_subdir(i))
+		_build_search_cache(dir.get_subdir(i), ignore)
 
 	for i in dir.get_file_count():
 		var file = dir.get_file_path(i)
@@ -182,3 +198,7 @@ func _sort_priority_files():
 
 static func is_ascii_identifier_char(c: String) -> bool:
 	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_'
+
+
+func _ignore_none(dir):
+	return false
