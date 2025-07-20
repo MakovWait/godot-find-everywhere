@@ -11,12 +11,12 @@ config_version=5
 [application]
 
 config/name="godot-find-everywhere"
-config/features=PackedStringArray("4.0", "GL Compatibility")
+config/features=PackedStringArray("4.5", "GL Compatibility")
 config/icon="res://icon.svg"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/QuickPluginManager/plugin.cfg", "res://addons/godot-last-tabs-switcher/plugin.cfg", "res://addons/godot-script-tabs/plugin.cfg", "res://addons/expand-region/plugin.cfg", "res://addons/zylann.editor_debugger/plugin.cfg", "res://addons/find-everywhere/plugin.cfg")
+enabled=PackedStringArray("res://addons/find-everywhere/plugin.cfg")
 
 [rendering]
 

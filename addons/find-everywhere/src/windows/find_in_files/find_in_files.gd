@@ -20,6 +20,7 @@ const FindInFilesCoroutine = preload(
 var editor_interface: EditorInterface
 var folders_to_ignore_setting_name: String
 
+@onready var _addons_ignore_btn: CheckButton = %AddonsIgnoreButton
 @onready var _search_options: Tree = %SearchOptions
 @onready var _code_edit: CodeEdit = %CodeEdit
 @onready var _line_edit: LineEdit = %LineEdit
@@ -237,6 +238,11 @@ func _ready() -> void:
 		_progress_label.text = "Searching... %s/%s" % [cur, all]
 	)
 	_search_coroutine.finished.connect(_progress_label.hide)
+	
+	_addons_ignore_btn.pressed.connect(func():
+		_search_coroutine.queue_to_rebuild_cache()
+		_update_search()
+	)
 
 
 func _exit_tree() -> void:
@@ -516,12 +522,23 @@ func _get_extensions_to_cache():
 
 
 func _get_folders_to_ignore():
+	var result = _get_folders_to_ignore_from_settings()
+	if not _addons_ignore_btn.button_pressed:
+		result.append("res://addons")
+	return result
+
+
+func _get_folders_to_ignore_from_settings():
 	var setting = editor_interface.get_editor_settings().get_setting(
 		folders_to_ignore_setting_name
 	)
 	var result = []
 	if setting is String:
-		result.append_array(setting.split(","))
+		var dirs = setting.split(",")
+		for dir in dirs:
+			if dir.simplify_path() == "res://addons":
+				continue
+			result.append(dir)
 	return result
 
 

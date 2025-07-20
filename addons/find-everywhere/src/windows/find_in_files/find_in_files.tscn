@@ -49,6 +49,20 @@ unique_name_in_owner = true
 layout_mode = 2
 text = "..."
 
+[node name="AddonsIgnore" type="HBoxContainer" parent="HBoxContainer"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="HBoxContainer/AddonsIgnore"]
+layout_mode = 2
+text = "addons:"
+
+[node name="AddonsIgnoreButton" type="CheckButton" parent="HBoxContainer/AddonsIgnore"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="VSeparator" type="VSeparator" parent="HBoxContainer/AddonsIgnore"]
+layout_mode = 2
+
 [node name="CheckBoxes" type="HBoxContainer" parent="HBoxContainer"]
 unique_name_in_owner = true
 layout_mode = 2
