@@ -327,9 +327,9 @@ func _get_edited_scene_path():
 func _get_edited_script_path():
 	var script_editor = editor_interface.get_script_editor()
 	if script_editor:
-		var current_editor = script_editor.get_current_editor()
-		if current_editor:
-			return current_editor.get("metadata/_edit_res_path")
+		var script = script_editor.get_current_script()
+		if script:
+			return script.resource_path
 	return null
 
 
